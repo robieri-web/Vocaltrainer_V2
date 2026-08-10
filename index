@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vokabeln">
+<meta name="theme-color" content="#0c0e16">
+<title>Vokabeltrainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
+:root{
+  --bg:#0c0e16; --s1:#13151f; --s2:#1c1f2e; --s3:#252839;
+  --border:#2e3148; --accent:#4f8ef7; --accent2:#7dd3fc;
+  --gold:#fbbf24; --green:#34d399; --red:#f87171;
+  --text:#e8eaf6; --muted:#7880a4; --r:14px;
+  --nav-h: 60px;
+  --top-h: 54px;
+}
+
+html, body {
+  /* KEY iOS FIX: body must NOT be overflow:hidden.
+     We use position:fixed + full-height pages instead. */
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+
+body {
+  background-image: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(79,142,247,.1) 0%, transparent 70%);
+}
+
+/* ─── FIXED TOP BAR ─────────────────────────────────── */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  top: env(safe-area-inset-top, 0);
+  height: var(--top-h);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 100;
+}
+.logo { font-family:'Fraunces',serif; font-size:1.4rem; font-weight:900; letter-spacing:-.5px; }
+.logo span { color: var(--accent); }
+
+/* ─── FIXED BOTTOM NAV ──────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  /* account for iPhone home indicator */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  background: var(--s1);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+}
+.nav-item {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  padding: 10px 0 8px;
+  border: none; background: transparent;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: .63rem; font-weight: 500;
+  cursor: pointer;
+  -webkit-user-select: none;
+}
+.nav-item.active { color: var(--accent); }
+.nav-item .icon { font-size: 1.3rem; line-height: 1; }
+
+/* ─── PAGE SYSTEM ───────────────────────────────────── */
+/*
+  CRITICAL iOS PWA FIX:
+  Each page is a normal block-level div that scrolls with
+  the window. No overflow:hidden ancestors.
+  We show/hide pages by display:none / display:block.
+  The body itself scrolls — this is the only reliable
+  way to get iOS software keyboard + input focus working
+  in a PWA.
+*/
+.page {
+  display: none;
+  min-height: 100vh;
+  padding-top: calc(var(--top-h) + env(safe-area-inset-top, 0px) + 12px);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 24px);
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.page.active { display: block; }
+
+/* ─── CARDS ─────────────────────────────────────────── */
+.card { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); padding:16px; margin-bottom:12px; }
+.card-label { font-size:.63rem; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:12px; }
+
+/* ─── LANGUAGE BUTTONS ──────────────────────────────── */
+.lang-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.lang-btn {
+  background:var(--s2); border:1.5px solid var(--border); border-radius:12px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:12px 4px;
+  font-family:'DM Sans',sans-serif; font-size:.75rem; font-weight:500;
+  color:var(--muted); cursor:pointer; -webkit-user-select:none;
+  transition: all .15s;
+}
+.lang-btn .flag { font-size:1.8rem; }
+.lang-btn.selected { border-color:var(--accent); background:rgba(79,142,247,.1); color:var(--accent2); }
+
+/* ─── LEVEL BUTTONS ─────────────────────────────────── */
+.level-btn {
+  background:var(--s2); border:1.5px solid var(--border); border-radius:12px;
+  display:block; width:100%; text-align:left; padding:13px 15px; margin-bottom:8px;
+  font-family:'DM Sans',sans-serif; color:var(--text);
+  cursor:pointer; -webkit-user-select:none; transition:all .15s;
+}
+.level-btn .ln { font-size:.92rem; font-weight:600; }
+.level-btn .ld { font-size:.7rem; color:var(--muted); margin-top:3px; }
+.level-btn.selected { border-color:var(--accent); background:rgba(79,142,247,.1); }
+.level-btn.selected .ld { color:rgba(125,211,252,.7); }
+
+.problem-btn {
+  background:rgba(248,113,113,.07); border:1.5px solid rgba(248,113,113,.3); border-radius:12px;
+  display:block; width:100%; text-align:left; padding:13px 15px; margin-bottom:8px;
+  font-family:'DM Sans',sans-serif; cursor:pointer; -webkit-user-select:none; transition:all .15s;
+}
+.problem-btn .ln { font-size:.92rem; font-weight:600; color:var(--red); }
+.problem-btn .ld { font-size:.7rem; color:var(--muted); margin-top:3px; }
+.problem-btn.selected { border-color:var(--red); background:rgba(248,113,113,.15); }
+.problem-count { display:inline-flex; align-items:center; justify-content:center; background:var(--red); color:#fff; border-radius:99px; font-size:.65rem; font-weight:700; padding:1px 7px; margin-left:6px; }
+
+/* ─── BUTTONS ───────────────────────────────────────── */
+.btn-primary {
+  background:var(--accent); border:none; border-radius:14px; color:#fff;
+  font-family:'DM Sans',sans-serif; font-size:1rem; font-weight:600;
+  padding:16px; width:100%; margin-top:4px;
+  -webkit-user-select:none; cursor:pointer; transition:opacity .15s;
+}
+.btn-primary:active { opacity:.75; }
+.btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+.btn-ghost {
+  background:transparent; border:1px solid var(--border); border-radius:12px;
+  color:var(--muted); font-family:'DM Sans',sans-serif; font-size:.85rem;
+  padding:12px; width:100%; margin-top:8px;
+  cursor:pointer; -webkit-user-select:none;
+}
+
+/* ─── PROGRESS BAR ──────────────────────────────────── */
+.progress { height:3px; background:var(--border); border-radius:99px; margin-bottom:14px; overflow:hidden; }
+.progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .5s ease; }
+
+/* ─── QUIZ ROW ───────────────────────────────────────── */
+.quiz-row { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:12px; }
+.qr-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.qr-left { display:flex; align-items:baseline; gap:6px; flex:1; flex-wrap:wrap; }
+.qr-num { font-size:.68rem; color:var(--muted); font-weight:600; flex-shrink:0; }
+.qr-word { font-family:'Fraunces',serif; font-size:1.4rem; font-weight:700; line-height:1.1; }
+.qr-tag { font-size:.58rem; color:var(--muted); background:var(--s2); border:1px solid var(--border); border-radius:99px; padding:1px 6px; }
+
+/*
+  CRITICAL iOS INPUT FIX:
+  1. font-size must be >= 16px to prevent Safari auto-zoom
+  2. -webkit-appearance:none removes iOS default styling
+  3. No position:relative/absolute hacks on the container
+  4. Input must be a direct child of a non-overflow:hidden parent
+*/
+.quiz-input-wrap { display:flex; align-items:center; gap:10px; }
+.quiz-input {
+  flex: 1;
+  background: var(--s2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;          /* prevents iOS zoom */
+  line-height: 1.4;
+  padding: 12px 14px;
+  min-height: 48px;         /* Apple HIG min touch target */
+  width: 100%;
+  outline: none;
+  -webkit-appearance: none; /* removes iOS inset shadow */
+  appearance: none;
+  /* NO transform, NO position:relative on parent = iOS can focus */
+}
+.quiz-input:focus { border-color: var(--accent); }
+.quiz-input.ok  { border-color: var(--green); background: rgba(52,211,153,.08); }
+.quiz-input.err { border-color: var(--red);   background: rgba(248,113,113,.08); }
+.quiz-input:disabled { opacity: .8; color: var(--text); }
+
+.correction {
+  display:flex; align-items:center; gap:8px;
+  font-size:.82rem; color:var(--green);
+  margin-top:10px; padding:8px 12px;
+  background:rgba(52,211,153,.07); border-radius:8px;
+}
+
+/* ─── SPEAK BUTTONS ─────────────────────────────────── */
+.btn-speak {
+  display:flex; align-items:center; justify-content:center;
+  background:var(--s2); border:1.5px solid var(--border); border-radius:10px;
+  color:var(--accent2);
+  min-width:48px; min-height:48px;
+  font-size:1.15rem; flex-shrink:0;
+  cursor:pointer; -webkit-user-select:none;
+  transition:all .15s;
+}
+.btn-speak:active { background:rgba(79,142,247,.2); }
+.btn-speak.speaking { border-color:var(--accent2); background:rgba(125,211,252,.15); animation:pulse .7s ease-in-out infinite alternate; }
+@keyframes pulse { from{box-shadow:0 0 0 0 rgba(125,211,252,.5)} to{box-shadow:0 0 0 8px rgba(125,211,252,0)} }
+
+.btn-speak-sm {
+  display:inline-flex; align-items:center; justify-content:center;
+  background:rgba(125,211,252,.1); border:1px solid rgba(125,211,252,.2); border-radius:7px;
+  color:var(--accent2); font-size:.82rem;
+  min-width:30px; min-height:30px;
+  flex-shrink:0; cursor:pointer;
+}
+
+/* ─── BADGES ────────────────────────────────────────── */
+.badge { display:inline-flex; align-items:center; gap:3px; font-size:.68rem; font-weight:600; padding:3px 9px; border-radius:99px; }
+.badge.ok  { background:rgba(52,211,153,.12);  color:var(--green); border:1px solid rgba(52,211,153,.25); }
+.badge.err { background:rgba(248,113,113,.12); color:var(--red);   border:1px solid rgba(248,113,113,.25); }
+
+/* ─── SCORE RING ────────────────────────────────────── */
+.score-ring-wrap { display:flex; flex-direction:column; align-items:center; padding:24px 16px 14px; }
+.ring-outer { position:relative; width:130px; height:130px; margin-bottom:12px; }
+.ring-outer svg { position:absolute; top:0; left:0; transform:rotate(-90deg); }
+.ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ring-pct { font-family:'Fraunces',serif; font-size:2.2rem; font-weight:900; line-height:1; }
+.ring-lbl { font-size:.62rem; color:var(--muted); }
+.score-title { font-family:'Fraunces',serif; font-size:1.35rem; font-weight:700; text-align:center; }
+.score-msg { font-size:.82rem; color:var(--muted); text-align:center; margin-top:4px; }
+.score-badges { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+
+/* ─── RESULT ROWS ───────────────────────────────────── */
+.result-row { padding:11px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.result-row:last-child { border:none; }
+.result-left { flex:1; min-width:0; }
+.result-q { font-size:.67rem; color:var(--muted); display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+.result-a { font-size:.93rem; word-break:break-word; }
+
+/* ─── STATS ─────────────────────────────────────────── */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.stat-box { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:16px; text-align:center; }
+.stat-n { font-family:'Fraunces',serif; font-size:1.9rem; font-weight:900; line-height:1; }
+.stat-l { font-size:.67rem; color:var(--muted); margin-top:5px; }
+.stat-green{color:var(--green)} .stat-red{color:var(--red)} .stat-gold{color:var(--gold)} .stat-blue{color:var(--accent2)}
+
+.hist-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+.hist-table th { color:var(--muted); font-weight:500; text-align:left; padding:5px 3px; border-bottom:1px solid var(--border); }
+.hist-table td { padding:7px 3px; border-bottom:1px solid rgba(46,49,72,.4); }
+.hist-table tr:last-child td { border:none; }
+
+.wrong-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); gap:10px; }
+.wrong-row:last-child { border:none; }
+.wrong-word { font-size:.88rem; font-weight:500; }
+.wrong-meta { font-size:.68rem; color:var(--muted); margin-top:2px; }
+
+/* ─── ALERTS ────────────────────────────────────────── */
+.alert { background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.2); border-radius:12px; padding:10px 14px; font-size:.78rem; color:var(--gold); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.install-banner { background:linear-gradient(135deg,rgba(79,142,247,.12),rgba(125,211,252,.08)); border:1px solid rgba(79,142,247,.25); border-radius:12px; padding:12px 14px; font-size:.76rem; color:var(--accent2); margin-bottom:14px; }
+.install-banner strong { display:block; font-size:.8rem; margin-bottom:3px; }
+
+.anim { animation: fadeUp .22s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- FIXED TOP BAR -->
+<div class="topbar">
+  <div class="logo">Vokabel<span>trainer</span></div>
+</div>
+
+<!-- ══════ PAGE: SETUP ══════ -->
+<div class="page active" id="page-setup">
+
+  <div class="install-banner" id="install-banner" style="display:none">
+    <strong>💡 Als App installieren</strong>
+    Safari → Teilen → <strong>„Zum Home-Bildschirm"</strong>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Fragensprache — diese Wörter sehe ich</div>
+    <div class="lang-grid">
+      <button class="lang-btn selected" onclick="pick('from','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
+      <button class="lang-btn" onclick="pick('from','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
+      <button class="lang-btn" onclick="pick('from','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Antwortsprache — in diese Sprache übersetze ich</div>
+    <div class="lang-grid">
+      <button class="lang-btn" onclick="pick('to','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
+      <button class="lang-btn selected" onclick="pick('to','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
+      <button class="lang-btn" onclick="pick('to','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Kategorie / Schwierigkeitsstufe</div>
+    <button class="level-btn selected" onclick="pickLevel('beginner',this)">
+      <div class="ln">🌱 Beginner</div>
+      <div class="ld">100 Wörter · Alltag, Farben, Zahlen, Familie</div>
+    </button>
+    <button class="level-btn" onclick="pickLevel('intermediate',this)">
+      <div class="ln">📚 Fortgeschritten</div>
+      <div class="ld">100 Wörter · Gesellschaft, Reisen, Berufe</div>
+    </button>
+    <button class="level-btn" onclick="pickLevel('expert',this)">
+      <div class="ln">🎓 Experte</div>
+      <div class="ld">100 Wörter · Akademisch, Philosophie, Wissenschaft</div>
+    </button>
+    <button class="problem-btn" id="problem-level-btn" onclick="pickLevel('problems',this)">
+      <div class="ln">❌ Problemwörter <span class="problem-count" id="problem-count-badge">0</span></div>
+      <div class="ld">Nur falsch beantwortete Wörter üben</div>
+    </button>
+  </div>
+
+  <div class="alert" id="wrong-alert" style="display:none">
+    ⚠️ <span><span id="wrong-count-info">0</span> Problemwörter können auftauchen</span>
+  </div>
+
+  <button class="btn-primary" id="start-btn" onclick="startQuiz()">Quiz starten (5 Wörter) →</button>
+</div>
+
+<!-- ══════ PAGE: QUIZ ══════ -->
+<div class="page" id="page-quiz">
+  <div class="progress"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  <div id="quiz-rows"></div>
+  <button class="btn-primary" id="submit-btn" onclick="submitAll()">Antworten prüfen →</button>
+  <button class="btn-ghost" onclick="goSetup()">← Zurück</button>
+</div>
+
+<!-- ══════ PAGE: RESULTS ══════ -->
+<div class="page" id="page-results">
+  <div class="score-ring-wrap">
+    <div class="ring-outer">
+      <svg width="130" height="130" viewBox="0 0 130 130">
+        <circle cx="65" cy="65" r="54" fill="none" stroke="var(--s3)" stroke-width="10"/>
+        <circle cx="65" cy="65" r="54" fill="none" stroke="var(--accent)" stroke-width="10"
+          stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="339"
+          id="ring-circle" style="transition:stroke-dashoffset .8s ease"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-pct" id="res-pct">—</div>
+        <div class="ring-lbl">Punkte</div>
+      </div>
+    </div>
+    <div class="score-title" id="res-title">—</div>
+    <div class="score-msg" id="res-msg">—</div>
+    <div class="score-badges">
+      <span class="badge ok" id="res-ok">—</span>
+      <span class="badge err" id="res-err">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Alle Antworten</div>
+    <div id="result-detail"></div>
+  </div>
+  <button class="btn-primary" onclick="startQuiz()">Nochmal spielen →</button>
+  <button class="btn-ghost" onclick="goSetup()">← Einstellungen</button>
+</div>
+
+<!-- ══════ PAGE: STATISTIK ══════ -->
+<div class="page" id="page-stats">
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-n stat-blue" id="st-versuche">0</div><div class="stat-l">Versuche</div></div>
+    <div class="stat-box"><div class="stat-n stat-gold" id="st-quote">0%</div><div class="stat-l">Trefferquote</div></div>
+    <div class="stat-box"><div class="stat-n stat-green" id="st-richtig">0</div><div class="stat-l">Richtig</div></div>
+    <div class="stat-box"><div class="stat-n stat-red" id="st-falsch">0</div><div class="stat-l">Falsch</div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">❌ Problemwörter (mehrfach falsch)</div>
+    <div id="st-wrong-list"><span style="color:var(--muted);font-size:.85rem">Noch keine Fehler!</span></div>
+  </div>
+  <div class="card">
+    <div class="card-label">📋 Verlauf</div>
+    <div id="st-history"><span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span></div>
+  </div>
+  <button class="btn-ghost" style="color:var(--red);border-color:rgba(248,113,113,.3);" onclick="resetStats()">🗑 Statistik zurücksetzen</button>
+</div>
+
+<!-- FIXED BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="nav-item active" id="nav-quiz" onclick="switchTab('quiz')">
+    <span class="icon">📝</span>Quiz
+  </button>
+  <button class="nav-item" id="nav-stats" onclick="switchTab('stats')">
+    <span class="icon">📊</span>Statistik
+  </button>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// VOCABULARY — 100 words per level
+// ════════════════════════════════════════════
+const VOCAB = {
+beginner:[
+  {de:"Hund",en:"dog",es:"perro"},{de:"Katze",en:"cat",es:"gato"},
+  {de:"Haus",en:"house",es:"casa"},{de:"Wasser",en:"water",es:"agua"},
+  {de:"Brot",en:"bread",es:"pan"},{de:"rot",en:"red",es:"rojo"},
+  {de:"blau",en:"blue",es:"azul"},{de:"Mutter",en:"mother",es:"madre"},
+  {de:"Vater",en:"father",es:"padre"},{de:"Buch",en:"book",es:"libro"},
+  {de:"Tisch",en:"table",es:"mesa"},{de:"Stuhl",en:"chair",es:"silla"},
+  {de:"Fenster",en:"window",es:"ventana"},{de:"Tür",en:"door",es:"puerta"},
+  {de:"Auto",en:"car",es:"coche"},{de:"Baum",en:"tree",es:"árbol"},
+  {de:"Sonne",en:"sun",es:"sol"},{de:"Mond",en:"moon",es:"luna"},
+  {de:"Apfel",en:"apple",es:"manzana"},{de:"Kind",en:"child",es:"niño"},
+  {de:"Schule",en:"school",es:"escuela"},{de:"Stadt",en:"city",es:"ciudad"},
+  {de:"grün",en:"green",es:"verde"},{de:"Milch",en:"milk",es:"leche"},
+  {de:"Bett",en:"bed",es:"cama"},{de:"Vogel",en:"bird",es:"pájaro"},
+  {de:"Fisch",en:"fish",es:"pez"},{de:"Blume",en:"flower",es:"flor"},
+  {de:"Hand",en:"hand",es:"mano"},{de:"Auge",en:"eye",es:"ojo"},
+  {de:"Nase",en:"nose",es:"nariz"},{de:"Ohr",en:"ear",es:"oreja"},
+  {de:"Mund",en:"mouth",es:"boca"},{de:"Kopf",en:"head",es:"cabeza"},
+  {de:"Fuß",en:"foot",es:"pie"},{de:"Arm",en:"arm",es:"brazo"},
+  {de:"Bein",en:"leg",es:"pierna"},{de:"Herz",en:"heart",es:"corazón"},
+  {de:"Hals",en:"neck",es:"cuello"},{de:"Rücken",en:"back",es:"espalda"},
+  {de:"Finger",en:"finger",es:"dedo"},{de:"eins",en:"one",es:"uno"},
+  {de:"zwei",en:"two",es:"dos"},{de:"drei",en:"three",es:"tres"},
+  {de:"vier",en:"four",es:"cuatro"},{de:"fünf",en:"five",es:"cinco"},
+  {de:"sechs",en:"six",es:"seis"},{de:"sieben",en:"seven",es:"siete"},
+  {de:"acht",en:"eight",es:"ocho"},{de:"neun",en:"nine",es:"nueve"},
+  {de:"zehn",en:"ten",es:"diez"},{de:"Montag",en:"Monday",es:"lunes"},
+  {de:"Dienstag",en:"Tuesday",es:"martes"},{de:"Mittwoch",en:"Wednesday",es:"miércoles"},
+  {de:"Donnerstag",en:"Thursday",es:"jueves"},{de:"Freitag",en:"Friday",es:"viernes"},
+  {de:"Samstag",en:"Saturday",es:"sábado"},{de:"Sonntag",en:"Sunday",es:"domingo"},
+  {de:"Januar",en:"January",es:"enero"},{de:"Februar",en:"February",es:"febrero"},
+  {de:"März",en:"March",es:"marzo"},{de:"April",en:"April",es:"abril"},
+  {de:"Mai",en:"May",es:"mayo"},{de:"Juni",en:"June",es:"junio"},
+  {de:"Juli",en:"July",es:"julio"},{de:"August",en:"August",es:"agosto"},
+  {de:"September",en:"September",es:"septiembre"},{de:"Oktober",en:"October",es:"octubre"},
+  {de:"November",en:"November",es:"noviembre"},{de:"Dezember",en:"December",es:"diciembre"},
+  {de:"Küche",en:"kitchen",es:"cocina"},{de:"Badezimmer",en:"bathroom",es:"baño"},
+  {de:"Schlafzimmer",en:"bedroom",es:"dormitorio"},{de:"Garten",en:"garden",es:"jardín"},
+  {de:"Straße",en:"street",es:"calle"},{de:"Markt",en:"market",es:"mercado"},
+  {de:"Supermarkt",en:"supermarket",es:"supermercado"},{de:"Bäckerei",en:"bakery",es:"panadería"},
+  {de:"Restaurant",en:"restaurant",es:"restaurante"},{de:"Café",en:"café",es:"café"},
+  {de:"Apotheke",en:"pharmacy",es:"farmacia"},{de:"Bank",en:"bank",es:"banco"},
+  {de:"Bibliothek",en:"library",es:"biblioteca"},{de:"Flughafen",en:"airport",es:"aeropuerto"},
+  {de:"Bahnhof",en:"train station",es:"estación"},{de:"Zug",en:"train",es:"tren"},
+  {de:"Bus",en:"bus",es:"autobús"},{de:"Flugzeug",en:"airplane",es:"avión"},
+  {de:"Schiff",en:"ship",es:"barco"},{de:"Fahrrad",en:"bicycle",es:"bicicleta"},
+  {de:"Telefon",en:"telephone",es:"teléfono"},{de:"Computer",en:"computer",es:"ordenador"},
+  {de:"Schlüssel",en:"key",es:"llave"},{de:"Brille",en:"glasses",es:"gafas"},
+  {de:"Uhr",en:"clock",es:"reloj"},{de:"Tasche",en:"bag",es:"bolso"},
+  {de:"Schuhe",en:"shoes",es:"zapatos"},{de:"Hemd",en:"shirt",es:"camisa"},
+  {de:"Hose",en:"trousers",es:"pantalón"},{de:"Jacke",en:"jacket",es:"chaqueta"},
+],
+intermediate:[
+  {de:"Freiheit",en:"freedom",es:"libertad"},{de:"Gerechtigkeit",en:"justice",es:"justicia"},
+  {de:"Regierung",en:"government",es:"gobierno"},{de:"Wissenschaft",en:"science",es:"ciencia"},
+  {de:"Gesellschaft",en:"society",es:"sociedad"},{de:"Bildung",en:"education",es:"educación"},
+  {de:"Umwelt",en:"environment",es:"medio ambiente"},{de:"Wirtschaft",en:"economy",es:"economía"},
+  {de:"Reise",en:"journey",es:"viaje"},{de:"Erfahrung",en:"experience",es:"experiencia"},
+  {de:"Entwicklung",en:"development",es:"desarrollo"},{de:"Verantwortung",en:"responsibility",es:"responsabilidad"},
+  {de:"Entscheidung",en:"decision",es:"decisión"},{de:"Beziehung",en:"relationship",es:"relación"},
+  {de:"Vertrauen",en:"trust",es:"confianza"},{de:"Kenntnis",en:"knowledge",es:"conocimiento"},
+  {de:"Fähigkeit",en:"ability",es:"habilidad"},{de:"Erfolg",en:"success",es:"éxito"},
+  {de:"Niederlage",en:"defeat",es:"derrota"},{de:"Wahrnehmung",en:"perception",es:"percepción"},
+  {de:"Fortschritt",en:"progress",es:"progreso"},{de:"Nachhaltigkeit",en:"sustainability",es:"sostenibilidad"},
+  {de:"Bewusstsein",en:"awareness",es:"conciencia"},{de:"Herausforderung",en:"challenge",es:"desafío"},
+  {de:"Gleichgewicht",en:"balance",es:"equilibrio"},{de:"Einfluss",en:"influence",es:"influencia"},
+  {de:"Verpflichtung",en:"commitment",es:"compromiso"},{de:"Widerstand",en:"resistance",es:"resistencia"},
+  {de:"Vereinbarung",en:"agreement",es:"acuerdo"},{de:"Meinungsverschiedenheit",en:"disagreement",es:"desacuerdo"},
+  {de:"Zusammenarbeit",en:"cooperation",es:"cooperación"},{de:"Gemeinschaft",en:"community",es:"comunidad"},
+  {de:"Netzwerk",en:"network",es:"red"},{de:"Strategie",en:"strategy",es:"estrategia"},
+  {de:"Innovation",en:"innovation",es:"innovación"},{de:"Technologie",en:"technology",es:"tecnología"},
+  {de:"Forschung",en:"research",es:"investigación"},{de:"Analyse",en:"analysis",es:"análisis"},
+  {de:"Lösung",en:"solution",es:"solución"},{de:"Risiko",en:"risk",es:"riesgo"},
+  {de:"Chance",en:"opportunity",es:"oportunidad"},{de:"Wachstum",en:"growth",es:"crecimiento"},
+  {de:"Investition",en:"investment",es:"inversión"},{de:"Steuer",en:"tax",es:"impuesto"},
+  {de:"Vertrag",en:"contract",es:"contrato"},{de:"Gesetz",en:"law",es:"ley"},
+  {de:"Recht",en:"right",es:"derecho"},{de:"Pflicht",en:"duty",es:"deber"},
+  {de:"Bürger",en:"citizen",es:"ciudadano"},{de:"Demokratie",en:"democracy",es:"democracia"},
+  {de:"Wahl",en:"election",es:"elección"},{de:"Partei",en:"party",es:"partido"},
+  {de:"Botschaft",en:"embassy",es:"embajada"},{de:"Grenze",en:"border",es:"frontera"},
+  {de:"Flüchtling",en:"refugee",es:"refugiado"},{de:"Migration",en:"migration",es:"migración"},
+  {de:"Integration",en:"integration",es:"integración"},{de:"Kultur",en:"culture",es:"cultura"},
+  {de:"Tradition",en:"tradition",es:"tradición"},{de:"Sprache",en:"language",es:"idioma"},
+  {de:"Geschichte",en:"history",es:"historia"},{de:"Kunst",en:"art",es:"arte"},
+  {de:"Musik",en:"music",es:"música"},{de:"Theater",en:"theatre",es:"teatro"},
+  {de:"Roman",en:"novel",es:"novela"},{de:"Gedicht",en:"poem",es:"poema"},
+  {de:"Journalist",en:"journalist",es:"periodista"},{de:"Arzt",en:"doctor",es:"médico"},
+  {de:"Anwalt",en:"lawyer",es:"abogado"},{de:"Ingenieur",en:"engineer",es:"ingeniero"},
+  {de:"Lehrer",en:"teacher",es:"profesor"},{de:"Forscher",en:"researcher",es:"investigador"},
+  {de:"Unternehmer",en:"entrepreneur",es:"empresario"},{de:"Mitarbeiter",en:"employee",es:"empleado"},
+  {de:"Kunde",en:"customer",es:"cliente"},{de:"Konkurrent",en:"competitor",es:"competidor"},
+  {de:"Umsatz",en:"revenue",es:"ingresos"},{de:"Gewinn",en:"profit",es:"beneficio"},
+  {de:"Verlust",en:"loss",es:"pérdida"},{de:"Schulden",en:"debt",es:"deuda"},
+  {de:"Kredit",en:"credit",es:"crédito"},{de:"Aktie",en:"share",es:"acción"},
+  {de:"Versicherung",en:"insurance",es:"seguro"},{de:"Gehalt",en:"salary",es:"salario"},
+  {de:"Bewerbung",en:"application",es:"solicitud"},{de:"Kündigung",en:"dismissal",es:"despido"},
+  {de:"Urlaub",en:"vacation",es:"vacaciones"},{de:"Konferenz",en:"conference",es:"conferencia"},
+  {de:"Präsentation",en:"presentation",es:"presentación"},{de:"Bericht",en:"report",es:"informe"},
+  {de:"Projekt",en:"project",es:"proyecto"},{de:"Frist",en:"deadline",es:"plazo"},
+  {de:"Sitzung",en:"meeting",es:"reunión"},{de:"Abteilung",en:"department",es:"departamento"},
+  {de:"Vorstand",en:"board",es:"consejo"},{de:"Geschäftsführer",en:"CEO",es:"director ejecutivo"},
+  {de:"Aktionär",en:"shareholder",es:"accionista"},{de:"Fusion",en:"merger",es:"fusión"},
+  {de:"Konkurs",en:"bankruptcy",es:"quiebra"},{de:"Börse",en:"stock exchange",es:"bolsa"},
+],
+expert:[
+  {de:"Epistemologie",en:"epistemology",es:"epistemología"},{de:"Phänomenologie",en:"phenomenology",es:"fenomenología"},
+  {de:"Ambiguität",en:"ambiguity",es:"ambigüedad"},{de:"Paradigma",en:"paradigm",es:"paradigma"},
+  {de:"Determinismus",en:"determinism",es:"determinismo"},{de:"Dialektik",en:"dialectic",es:"dialéctica"},
+  {de:"Hegemonie",en:"hegemony",es:"hegemonía"},{de:"Metaphysik",en:"metaphysics",es:"metafísica"},
+  {de:"Pluralismus",en:"pluralism",es:"pluralismo"},{de:"Ästhetik",en:"aesthetics",es:"estética"},
+  {de:"Kausalität",en:"causality",es:"causalidad"},{de:"Ontologie",en:"ontology",es:"ontología"},
+  {de:"Utilitarismus",en:"utilitarianism",es:"utilitarismo"},{de:"Souveränität",en:"sovereignty",es:"soberanía"},
+  {de:"Imperativ",en:"imperative",es:"imperativo"},{de:"Axiom",en:"axiom",es:"axioma"},
+  {de:"Kontingenz",en:"contingency",es:"contingencia"},{de:"Tautologie",en:"tautology",es:"tautología"},
+  {de:"Divergenz",en:"divergence",es:"divergencia"},{de:"Resilienz",en:"resilience",es:"resiliencia"},
+  {de:"Subsidiarität",en:"subsidiarity",es:"subsidiariedad"},{de:"Syllogismus",en:"syllogism",es:"silogismo"},
+  {de:"Transzendenz",en:"transcendence",es:"trascendencia"},{de:"Pragmatismus",en:"pragmatism",es:"pragmatismo"},
+  {de:"Relativismus",en:"relativism",es:"relativismo"},{de:"Kognition",en:"cognition",es:"cognición"},
+  {de:"Deduktion",en:"deduction",es:"deducción"},{de:"Induktion",en:"induction",es:"inducción"},
+  {de:"Postulat",en:"postulate",es:"postulado"},{de:"Antithese",en:"antithesis",es:"antítesis"},
+  {de:"Hypothese",en:"hypothesis",es:"hipótesis"},{de:"Synthese",en:"synthesis",es:"síntesis"},
+  {de:"Abstraktion",en:"abstraction",es:"abstracción"},{de:"Analogie",en:"analogy",es:"analogía"},
+  {de:"Paradoxon",en:"paradox",es:"paradoja"},{de:"Kohärenz",en:"coherence",es:"coherencia"},
+  {de:"Konsistenz",en:"consistency",es:"consistencia"},{de:"Korrelation",en:"correlation",es:"correlación"},
+  {de:"Konvergenz",en:"convergence",es:"convergencia"},{de:"Kontroverse",en:"controversy",es:"controversia"},
+  {de:"Konsens",en:"consensus",es:"consenso"},{de:"Legitimität",en:"legitimacy",es:"legitimidad"},
+  {de:"Autorität",en:"authority",es:"autoridad"},{de:"Hierarchie",en:"hierarchy",es:"jerarquía"},
+  {de:"Bürokratie",en:"bureaucracy",es:"burocracia"},{de:"Ideologie",en:"ideology",es:"ideología"},
+  {de:"Utopie",en:"utopia",es:"utopía"},{de:"Anarchie",en:"anarchy",es:"anarquía"},
+  {de:"Totalitarismus",en:"totalitarianism",es:"totalitarismo"},{de:"Liberalismus",en:"liberalism",es:"liberalismo"},
+  {de:"Konservatismus",en:"conservatism",es:"conservadurismo"},{de:"Sozialismus",en:"socialism",es:"socialismo"},
+  {de:"Kapitalismus",en:"capitalism",es:"capitalismo"},{de:"Globalisierung",en:"globalization",es:"globalización"},
+  {de:"Nationalismus",en:"nationalism",es:"nacionalismo"},{de:"Imperialismus",en:"imperialism",es:"imperialismo"},
+  {de:"Kolonialismus",en:"colonialism",es:"colonialismo"},{de:"Diskriminierung",en:"discrimination",es:"discriminación"},
+  {de:"Emanzipation",en:"emancipation",es:"emancipación"},{de:"Feminismus",en:"feminism",es:"feminismo"},
+  {de:"Ökologie",en:"ecology",es:"ecología"},{de:"Biodiversität",en:"biodiversity",es:"biodiversidad"},
+  {de:"Klimawandel",en:"climate change",es:"cambio climático"},{de:"Quantenmechanik",en:"quantum mechanics",es:"mecánica cuántica"},
+  {de:"Neurologie",en:"neurology",es:"neurología"},{de:"Psychoanalyse",en:"psychoanalysis",es:"psicoanálisis"},
+  {de:"Behaviourismus",en:"behaviourism",es:"conductismo"},{de:"Kognitionswissenschaft",en:"cognitive science",es:"ciencia cognitiva"},
+  {de:"Linguistik",en:"linguistics",es:"lingüística"},{de:"Semiotik",en:"semiotics",es:"semiótica"},
+  {de:"Hermeneutik",en:"hermeneutics",es:"hermenéutica"},{de:"Dekonstruktion",en:"deconstruction",es:"deconstrucción"},
+  {de:"Postmodernismus",en:"postmodernism",es:"posmodernismo"},{de:"Strukturalismus",en:"structuralism",es:"estructuralismo"},
+  {de:"Existenzialismus",en:"existentialism",es:"existencialismo"},{de:"Stoizismus",en:"stoicism",es:"estoicismo"},
+  {de:"Empirismus",en:"empiricism",es:"empirismo"},{de:"Rationalismus",en:"rationalism",es:"racionalismo"},
+  {de:"Skeptizismus",en:"scepticism",es:"escepticismo"},{de:"Nihilismus",en:"nihilism",es:"nihilismo"},
+  {de:"Agnostizismus",en:"agnosticism",es:"agnosticismo"},{de:"Atheismus",en:"atheism",es:"ateísmo"},
+  {de:"Theismus",en:"theism",es:"teísmo"},{de:"Pantheismus",en:"pantheism",es:"panteísmo"},
+  {de:"Mystizismus",en:"mysticism",es:"misticismo"},{de:"Eschatologie",en:"eschatology",es:"escatología"},
+  {de:"Theodizee",en:"theodicy",es:"teodicea"},{de:"Phänomen",en:"phenomenon",es:"fenómeno"},
+  {de:"Dialektisch",en:"dialectical",es:"dialéctico"},{de:"Apriori",en:"a priori",es:"a priori"},
+  {de:"Aposteriori",en:"a posteriori",es:"a posteriori"},{de:"Noumenon",en:"noumenon",es:"noúmeno"},
+  {de:"Immanenz",en:"immanence",es:"inmanencia"},{de:"Dualismus",en:"dualism",es:"dualismo"},
+  {de:"Monismus",en:"monism",es:"monismo"},{de:"Reduktionismus",en:"reductionism",es:"reduccionismo"},
+  {de:"Holismus",en:"holism",es:"holismo"},{de:"Teleologie",en:"teleology",es:"teleología"},
+]
+};
+
+const LANG_NAMES={de:"Deutsch 🇩🇪",en:"Englisch 🇬🇧",es:"Spanisch 🇪🇸"};
+const LANG_BCP={de:"de-DE",en:"en-GB",es:"es-ES"};
+const LEVEL_NAMES={beginner:"Beginner",intermediate:"Fortgeschritten",expert:"Experte",problems:"Problemwörter"};
+const MSGS=[[5,"🏆 Perfekt!","Alle 5 richtig — fantastisch!"],[4,"🌟 Ausgezeichnet!","Fast perfekt!"],[3,"👍 Gut gemacht!","Mehr als die Hälfte!"],[2,"📖 Weiter üben!","Du schaffst das!"],[0,"💪 Nicht aufgeben!","Übung macht den Meister!"]];
+
+// ── STATE ──────────────────────────────────────────
+let cfg={from:"de",to:"en",level:"beginner"};
+let session={words:[],answers:[],submitted:false};
+let usedIdx={beginner:new Set(),intermediate:new Set(),expert:new Set()};
+let currentTab='quiz'; // 'quiz' | 'stats'
+
+// ── STATS ──────────────────────────────────────────
+function initStats(){return{versuche:0,richtig:0,falsch:0,wrongWords:{},history:[]};}
+function loadStats(){try{return JSON.parse(localStorage.getItem('vk3_stats'))||initStats();}catch{return initStats();}}
+function saveStats(){localStorage.setItem('vk3_stats',JSON.stringify(stats));}
+let stats=loadStats();
+
+// ── SPEECH ─────────────────────────────────────────
+let activeSpeakBtn=null;
+function speak(word,lang,btn){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  if(activeSpeakBtn&&activeSpeakBtn!==btn){activeSpeakBtn.classList.remove('speaking');activeSpeakBtn.textContent='🔊';}
+  if(activeSpeakBtn===btn){activeSpeakBtn=null;btn.classList.remove('speaking');btn.textContent='🔊';return;}
+  activeSpeakBtn=btn;btn.classList.add('speaking');btn.textContent='🔉';
+  const u=new SpeechSynthesisUtterance(word);
+  u.lang=LANG_BCP[lang];u.rate=0.88;
+  u.onend=u.onerror=()=>{btn.classList.remove('speaking');btn.textContent='🔊';if(activeSpeakBtn===btn)activeSpeakBtn=null;};
+  speechSynthesis.speak(u);
+}
+
+// ── HELPERS ────────────────────────────────────────
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function norm(s){return s.trim().toLowerCase().replace(/[áàâ]/g,'a').replace(/[éèê]/g,'e').replace(/[íìî]/g,'i').replace(/[óòô]/g,'o').replace(/[úùû]/g,'u').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ä/g,'ae').replace(/ß/g,'ss').replace(/ñ/g,'n');}
+function check(input,correct){const ni=norm(input),nc=norm(correct);return ni===nc||nc.split(' ').some(w=>w===ni);}
+function mkSpeak(cls){const b=document.createElement('button');b.className=cls;b.textContent='🔊';b.type='button';return b;}
+
+// ── PAGE / TAB NAVIGATION ──────────────────────────
+// All pages exist in DOM; we simply show/hide.
+// body scrolls normally — no overflow:hidden anywhere.
+const QUIZ_PAGES=['page-setup','page-quiz','page-results'];
+const ALL_PAGES=[...QUIZ_PAGES,'page-stats'];
+
+function showPage(id){
+  ALL_PAGES.forEach(p=>{
+    const el=document.getElementById(p);
+    el.classList.remove('active','anim');
+  });
+  const el=document.getElementById(id);
+  el.classList.add('active','anim');
+  window.scrollTo(0,0);
+}
+
+function switchTab(name){
+  currentTab=name;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-'+name).classList.add('active');
+  if(name==='stats'){showPage('page-stats');renderStats();}
+  else{showPage('page-setup');updateProblemBadge();}
+}
+
+function goSetup(){showPage('page-setup');updateProblemBadge();}
+
+function pick(type,lang,el){
+  document.querySelectorAll(`[onclick^="pick('${type}"]`).forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');cfg[type]=lang;checkCfg();
+}
+function pickLevel(level,el){
+  document.querySelectorAll('.level-btn,.problem-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');cfg.level=level;checkCfg();
+}
+function checkCfg(){
+  const ok=cfg.from!==cfg.to;
+  const btn=document.getElementById('start-btn');
+  btn.disabled=!ok;
+  if(!ok)btn.textContent='⚠ Verschiedene Sprachen wählen';
+  else if(cfg.level==='problems')btn.textContent='Problemwörter üben →';
+  else btn.textContent='Quiz starten (5 Wörter) →';
+}
+function updateProblemBadge(){
+  const count=getProblemWords().length;
+  document.getElementById('problem-count-badge').textContent=count;
+  const wa=document.getElementById('wrong-alert');
+  if(count>0&&cfg.level!=='problems'){document.getElementById('wrong-count-info').textContent=count;wa.style.display='flex';}
+  else wa.style.display='none';
+}
+
+// ── PROBLEM WORDS ──────────────────────────────────
+function getProblemWords(){
+  const result=[];
+  ['beginner','intermediate','expert'].forEach(lv=>{
+    const ww=stats.wrongWords[lv]||{};
+    Object.keys(ww).filter(k=>ww[k]>=2).forEach(k=>{
+      const match=VOCAB[lv].find(v=>v.de===k);
+      if(match&&!result.find(r=>r.de===match.de))result.push(match);
+    });
+  });
+  return result;
+}
+
+// ── START QUIZ ─────────────────────────────────────
+function startQuiz(){
+  if(cfg.from===cfg.to)return;
+  let selected=[];
+  if(cfg.level==='problems'){
+    const pool=getProblemWords();
+    if(!pool.length){alert('Noch keine Problemwörter!');return;}
+    selected=shuffle(pool).slice(0,Math.min(5,pool.length));
+  } else {
+    const pool=VOCAB[cfg.level];
+    let avail=pool.map((_,i)=>i).filter(i=>!usedIdx[cfg.level].has(i));
+    if(avail.length<5){usedIdx[cfg.level]=new Set();avail=pool.map((_,i)=>i);}
+    const picked=shuffle(avail).slice(0,5);
+    picked.forEach(i=>usedIdx[cfg.level].add(i));
+    selected=picked.map(i=>pool[i]);
+  }
+  session={words:selected,answers:new Array(selected.length).fill(''),submitted:false};
+  renderQuiz();
+  showPage('page-quiz');
+}
+
+// ── RENDER QUIZ ────────────────────────────────────
+function renderQuiz(){
+  const container=document.getElementById('quiz-rows');
+  container.innerHTML='';
+  document.getElementById('prog').style.width='0%';
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('submit-btn').textContent='Antworten prüfen →';
+
+  session.words.forEach((word,i)=>{
+    const row=document.createElement('div');
+    row.className='quiz-row';
+
+    // Top: number + word + speak
+    const top=document.createElement('div');
+    top.className='qr-top';
+    const left=document.createElement('div');
+    left.className='qr-left';
+    left.innerHTML=`<span class="qr-num">${i+1}</span><span class="qr-word">${word[cfg.from]}</span><span class="qr-tag">${cfg.from.toUpperCase()}</span>`;
+    const sb=mkSpeak('btn-speak');
+    sb.setAttribute('aria-label','Aussprache');
+    sb.addEventListener('click',()=>speak(word[cfg.from],cfg.from,sb));
+    top.appendChild(left);top.appendChild(sb);
+
+    // Input row
+    const wrap=document.createElement('div');
+    wrap.className='quiz-input-wrap';
+
+    const inp=document.createElement('input');
+    inp.id=`inp-${i}`;
+    inp.className='quiz-input';
+    inp.type='text';
+    // All the iOS attributes that matter:
+    inp.setAttribute('autocomplete','off');
+    inp.setAttribute('autocorrect','off');
+    inp.setAttribute('autocapitalize','none');
+    inp.setAttribute('spellcheck','false');
+    inp.setAttribute('enterkeyhint', i < session.words.length-1 ? 'next' : 'done');
+    inp.placeholder=LANG_NAMES[cfg.to].replace(/ .*/,'')+' …';
+
+    // Store value on every keystroke (iOS sometimes fires 'input' late)
+    inp.addEventListener('input',function(){session.answers[i]=this.value;});
+    inp.addEventListener('change',function(){session.answers[i]=this.value;});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        session.answers[i]=this.value;
+        const nx=document.getElementById(`inp-${i+1}`);
+        if(nx){nx.focus();}
+        else{this.blur();submitAll();}
+      }
+    });
+
+    wrap.appendChild(inp);
+    row.appendChild(top);row.appendChild(wrap);
+    container.appendChild(row);
+  });
+
+  // Focus first field after page transition settles
+  setTimeout(()=>{
+    const f=document.getElementById('inp-0');
+    if(f)f.focus();
+  },400);
+}
+
+// ── SUBMIT ─────────────────────────────────────────
+function submitAll(){
+  if(session.submitted)return;
+  // Read all inputs directly from DOM before disabling
+  session.words.forEach((_,i)=>{
+    const el=document.getElementById(`inp-${i}`);
+    if(el)session.answers[i]=el.value;
+  });
+  session.submitted=true;
+  let correct=0;const results=[];
+
+  session.words.forEach((word,i)=>{
+    const inp=document.getElementById(`inp-${i}`);
+    const userVal=(session.answers[i]||'').trim();
+    const correctVal=word[cfg.to];
+    const ok=check(userVal,correctVal);
+    if(ok)correct++;
+    if(inp){inp.classList.add(ok?'ok':'err');inp.disabled=true;}
+    if(!ok){
+      const cor=document.createElement('div');cor.className='correction';
+      cor.textContent=`✓ ${correctVal} `;
+      const csb=mkSpeak('btn-speak-sm');
+      csb.addEventListener('click',()=>speak(correctVal,cfg.to,csb));
+      cor.appendChild(csb);
+      inp.closest('.quiz-row').appendChild(cor);
+    }
+    const lvl=findWordLevel(word);
+    results.push({storeKey:word.de,word:word[cfg.from],user:userVal,correct:correctVal,ok,lvl});
+  });
+
+  document.getElementById('prog').style.width='100%';
+  document.getElementById('submit-btn').disabled=true;
+
+  // Stats
+  stats.versuche++;stats.richtig+=correct;stats.falsch+=(session.words.length-correct);
+  results.forEach(r=>{
+    const lv=r.lvl||'beginner';
+    if(!stats.wrongWords[lv])stats.wrongWords[lv]={};
+    if(!r.ok){stats.wrongWords[lv][r.storeKey]=(stats.wrongWords[lv][r.storeKey]||0)+1;}
+    else{if(stats.wrongWords[lv][r.storeKey]>0)stats.wrongWords[lv][r.storeKey]--;if(stats.wrongWords[lv][r.storeKey]===0)delete stats.wrongWords[lv][r.storeKey];}
+  });
+  stats.history.unshift({date:new Date().toLocaleDateString('de-CH'),level:LEVEL_NAMES[cfg.level],from:cfg.from.toUpperCase(),to:cfg.to.toUpperCase(),correct,total:session.words.length});
+  if(stats.history.length>100)stats.history=stats.history.slice(0,100);
+  saveStats();
+  setTimeout(()=>showResults(correct,results),350);
+}
+
+function findWordLevel(wordObj){
+  for(const lv of['beginner','intermediate','expert'])if(VOCAB[lv].some(v=>v.de===wordObj.de))return lv;
+  return 'beginner';
+}
+
+// ── RESULTS ────────────────────────────────────────
+function showResults(correct,results){
+  const total=results.length;
+  const pct=Math.round(correct/total*100);
+  document.getElementById('res-pct').textContent=pct+'%';
+  const circ=339;
+  document.getElementById('ring-circle').style.strokeDashoffset=circ-(circ*pct/100);
+  document.getElementById('ring-circle').style.stroke=pct>=80?'var(--green)':pct>=60?'var(--accent)':'var(--red)';
+  const [,title,msg]=MSGS.find(([min])=>correct>=min);
+  document.getElementById('res-title').textContent=title;
+  document.getElementById('res-msg').textContent=msg;
+  document.getElementById('res-ok').textContent=`${correct} Richtig`;
+  document.getElementById('res-err').textContent=`${total-correct} Falsch`;
+
+  const detail=document.getElementById('result-detail');detail.innerHTML='';
+  results.forEach(r=>{
+    const row=document.createElement('div');row.className='result-row';
+    const left=document.createElement('div');left.className='result-left';
+    const qLine=document.createElement('div');qLine.className='result-q';
+    qLine.textContent=r.word+' ';
+    const sbQ=mkSpeak('btn-speak-sm');sbQ.addEventListener('click',()=>speak(r.word,cfg.from,sbQ));
+    qLine.appendChild(sbQ);
+    const aLine=document.createElement('div');aLine.className='result-a';
+    aLine.innerHTML=r.user||'<em style="color:var(--muted)">—</em>';
+    left.appendChild(qLine);left.appendChild(aLine);
+    if(!r.ok){
+      const cLine=document.createElement('div');cLine.className='correction';
+      cLine.textContent=`✓ ${r.correct} `;
+      const sbC=mkSpeak('btn-speak-sm');sbC.addEventListener('click',()=>speak(r.correct,cfg.to,sbC));
+      cLine.appendChild(sbC);left.appendChild(cLine);
+    }
+    const badge=document.createElement('span');badge.className='badge '+(r.ok?'ok':'err');badge.textContent=r.ok?'✓':'✗';
+    row.appendChild(left);row.appendChild(badge);detail.appendChild(row);
+  });
+  showPage('page-results');
+}
+
+// ── STATS RENDER ───────────────────────────────────
+function renderStats(){
+  const total=stats.richtig+stats.falsch;
+  const quote=total>0?Math.round(stats.richtig/total*100):0;
+  document.getElementById('st-versuche').textContent=stats.versuche;
+  document.getElementById('st-quote').textContent=quote+'%';
+  document.getElementById('st-richtig').textContent=stats.richtig;
+  document.getElementById('st-falsch').textContent=stats.falsch;
+
+  const allWrong=[];
+  Object.keys(stats.wrongWords).forEach(lv=>{
+    Object.keys(stats.wrongWords[lv]).forEach(key=>{
+      const cnt=stats.wrongWords[lv][key];
+      if(cnt>=1){
+        const wObj=['beginner','intermediate','expert'].reduce((f,l)=>f||VOCAB[l].find(v=>v.de===key),null);
+        allWrong.push({key,level:LEVEL_NAMES[lv]||lv,count:cnt,wObj});
+      }
+    });
+  });
+  allWrong.sort((a,b)=>b.count-a.count);
+
+  const wwEl=document.getElementById('st-wrong-list');
+  if(!allWrong.length){wwEl.innerHTML='<span style="color:var(--muted);font-size:.85rem">Noch keine Fehler — top!</span>';}
+  else{wwEl.innerHTML=allWrong.map(w=>`<div class="wrong-row"><div><div class="wrong-word">${w.key}</div>${w.wObj?`<div class="wrong-meta">EN: ${w.wObj.en} · ES: ${w.wObj.es}</div>`:''}
+    <div class="wrong-meta">${w.level}</div></div><span class="badge err">${w.count}× falsch</span></div>`).join('');}
+
+  const hEl=document.getElementById('st-history');
+  if(!stats.history.length){hEl.innerHTML='<span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span>';}
+  else{hEl.innerHTML=`<table class="hist-table"><thead><tr><th>Datum</th><th>Level</th><th>Spr.</th><th>Score</th></tr></thead><tbody>
+    ${stats.history.slice(0,30).map(h=>`<tr><td style="color:var(--muted)">${h.date}</td><td>${h.level}</td><td style="color:var(--muted)">${h.from}→${h.to}</td>
+    <td style="color:${h.correct===h.total?'var(--green)':h.correct>=h.total*.6?'var(--accent2)':'var(--red)'};font-weight:600">${h.correct}/${h.total}</td></tr>`).join('')}
+    </tbody></table>`;}
+}
+
+function resetStats(){
+  if(confirm('Statistik wirklich zurücksetzen?')){
+    stats=initStats();usedIdx={beginner:new Set(),intermediate:new Set(),expert:new Set()};
+    saveStats();renderStats();updateProblemBadge();
+  }
+}
+
+// ── iOS INSTALL BANNER ─────────────────────────────
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+if(isIOS&&!window.navigator.standalone)document.getElementById('install-banner').style.display='block';
+
+// ── INIT ───────────────────────────────────────────
+checkCfg();
+updateProblemBadge();
+</script>
+</body>
+</html>
