@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#0c0e16">
 <title>Vokabeltrainer</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="vocab-data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ─── RESET ─────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -103,7 +105,7 @@ body {
 .card-label { font-size:.63rem; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:12px; }
 
 /* ─── LANGUAGE BUTTONS ──────────────────────────────── */
-.lang-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.lang-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .lang-btn {
   background:var(--s2); border:1.5px solid var(--border); border-radius:12px;
   display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -191,8 +193,8 @@ body {
   /* NO transform, NO position:relative on parent = iOS can focus */
 }
 .quiz-input:focus { border-color: var(--accent); }
-.quiz-input.ok  { border-color: var(--green); background: rgba(52,211,153,.08); }
-.quiz-input.err { border-color: var(--red);   background: rgba(248,113,113,.08); }
+.quiz-input.ok  { border-color: var(--green); background: rgba(52,211,153,.08); color: var(--green); font-weight:600; }
+.quiz-input.err { border-color: var(--red);   background: rgba(248,113,113,.08); color: var(--red); font-weight:600; }
 .quiz-input:disabled { opacity: .8; color: var(--text); }
 
 .correction {
@@ -246,6 +248,8 @@ body {
 .result-left { flex:1; min-width:0; }
 .result-q { font-size:.67rem; color:var(--muted); display:flex; align-items:center; gap:5px; margin-bottom:3px; }
 .result-a { font-size:.93rem; word-break:break-word; }
+.result-a.ok  { color: var(--green); font-weight:600; }
+.result-a.err { color: var(--red);   font-weight:600; }
 
 /* ─── STATS ─────────────────────────────────────────── */
 .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
@@ -294,6 +298,7 @@ body {
       <button class="lang-btn selected" onclick="pick('from','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
       <button class="lang-btn" onclick="pick('from','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
       <button class="lang-btn" onclick="pick('from','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+      <button class="lang-btn" onclick="pick('from','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
     </div>
   </div>
 
@@ -303,6 +308,7 @@ body {
       <button class="lang-btn" onclick="pick('to','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
       <button class="lang-btn selected" onclick="pick('to','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
       <button class="lang-btn" onclick="pick('to','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+      <button class="lang-btn" onclick="pick('to','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
     </div>
   </div>
 
@@ -310,15 +316,15 @@ body {
     <div class="card-label">Kategorie / Schwierigkeitsstufe</div>
     <button class="level-btn selected" onclick="pickLevel('beginner',this)">
       <div class="ln">🌱 Beginner</div>
-      <div class="ld">100 Wörter · Alltag, Farben, Zahlen, Familie</div>
+      <div class="ld"><span id="cnt-beginner">…</span> Wörter · Alltag, Farben, Zahlen, Familie</div>
     </button>
     <button class="level-btn" onclick="pickLevel('intermediate',this)">
       <div class="ln">📚 Fortgeschritten</div>
-      <div class="ld">100 Wörter · Gesellschaft, Reisen, Berufe</div>
+      <div class="ld"><span id="cnt-intermediate">…</span> Wörter · Gesellschaft, Reisen, Berufe</div>
     </button>
     <button class="level-btn" onclick="pickLevel('expert',this)">
       <div class="ln">🎓 Experte</div>
-      <div class="ld">100 Wörter · Akademisch, Philosophie, Wissenschaft</div>
+      <div class="ld"><span id="cnt-expert">…</span> Wörter · Politik, Wirtschaft, Wissenschaft</div>
     </button>
     <button class="problem-btn" id="problem-level-btn" onclick="pickLevel('problems',this)">
       <div class="ln">❌ Problemwörter <span class="problem-count" id="problem-count-badge">0</span></div>
@@ -389,6 +395,21 @@ body {
     <div id="st-history"><span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span></div>
   </div>
   <button class="btn-ghost" style="color:var(--red);border-color:rgba(248,113,113,.3);" onclick="resetStats()">🗑 Statistik zurücksetzen</button>
+
+  <div class="card" id="sync-card" style="display:none;">
+    <div class="card-label">☁️ Cloud-Sync</div>
+    <div id="sync-logged-out">
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">Melde dich per E-Mail an, um deinen Fortschritt geräteübergreifend zu synchronisieren.</p>
+      <input type="email" id="sync-email" class="quiz-input" placeholder="deine@email.ch" autocapitalize="none" autocorrect="off" style="margin-bottom:8px;">
+      <button class="btn-primary" style="margin-top:0;" onclick="sendMagicLink()">Login-Link senden</button>
+      <div class="status-msg" id="sync-status" style="font-size:.78rem;color:var(--muted);margin-top:8px;"></div>
+    </div>
+    <div id="sync-logged-in" style="display:none;">
+      <p style="font-size:.82rem;">✅ Angemeldet als <strong id="sync-user-email"></strong></p>
+      <p style="font-size:.75rem;color:var(--muted);margin:4px 0 10px;">Dein Fortschritt wird automatisch synchronisiert.</p>
+      <button class="btn-ghost" onclick="signOutCloud()">Abmelden</button>
+    </div>
+  </div>
 </div>
 
 <!-- FIXED BOTTOM NAV -->
@@ -403,168 +424,12 @@ body {
 
 <script>
 // ════════════════════════════════════════════
-// VOCABULARY — 100 words per level
+// VOCABULARY — loaded from vocab-data.js (window.VOCAB)
 // ════════════════════════════════════════════
-const VOCAB = {
-beginner:[
-  {de:"Hund",en:"dog",es:"perro"},{de:"Katze",en:"cat",es:"gato"},
-  {de:"Haus",en:"house",es:"casa"},{de:"Wasser",en:"water",es:"agua"},
-  {de:"Brot",en:"bread",es:"pan"},{de:"rot",en:"red",es:"rojo"},
-  {de:"blau",en:"blue",es:"azul"},{de:"Mutter",en:"mother",es:"madre"},
-  {de:"Vater",en:"father",es:"padre"},{de:"Buch",en:"book",es:"libro"},
-  {de:"Tisch",en:"table",es:"mesa"},{de:"Stuhl",en:"chair",es:"silla"},
-  {de:"Fenster",en:"window",es:"ventana"},{de:"Tür",en:"door",es:"puerta"},
-  {de:"Auto",en:"car",es:"coche"},{de:"Baum",en:"tree",es:"árbol"},
-  {de:"Sonne",en:"sun",es:"sol"},{de:"Mond",en:"moon",es:"luna"},
-  {de:"Apfel",en:"apple",es:"manzana"},{de:"Kind",en:"child",es:"niño"},
-  {de:"Schule",en:"school",es:"escuela"},{de:"Stadt",en:"city",es:"ciudad"},
-  {de:"grün",en:"green",es:"verde"},{de:"Milch",en:"milk",es:"leche"},
-  {de:"Bett",en:"bed",es:"cama"},{de:"Vogel",en:"bird",es:"pájaro"},
-  {de:"Fisch",en:"fish",es:"pez"},{de:"Blume",en:"flower",es:"flor"},
-  {de:"Hand",en:"hand",es:"mano"},{de:"Auge",en:"eye",es:"ojo"},
-  {de:"Nase",en:"nose",es:"nariz"},{de:"Ohr",en:"ear",es:"oreja"},
-  {de:"Mund",en:"mouth",es:"boca"},{de:"Kopf",en:"head",es:"cabeza"},
-  {de:"Fuß",en:"foot",es:"pie"},{de:"Arm",en:"arm",es:"brazo"},
-  {de:"Bein",en:"leg",es:"pierna"},{de:"Herz",en:"heart",es:"corazón"},
-  {de:"Hals",en:"neck",es:"cuello"},{de:"Rücken",en:"back",es:"espalda"},
-  {de:"Finger",en:"finger",es:"dedo"},{de:"eins",en:"one",es:"uno"},
-  {de:"zwei",en:"two",es:"dos"},{de:"drei",en:"three",es:"tres"},
-  {de:"vier",en:"four",es:"cuatro"},{de:"fünf",en:"five",es:"cinco"},
-  {de:"sechs",en:"six",es:"seis"},{de:"sieben",en:"seven",es:"siete"},
-  {de:"acht",en:"eight",es:"ocho"},{de:"neun",en:"nine",es:"nueve"},
-  {de:"zehn",en:"ten",es:"diez"},{de:"Montag",en:"Monday",es:"lunes"},
-  {de:"Dienstag",en:"Tuesday",es:"martes"},{de:"Mittwoch",en:"Wednesday",es:"miércoles"},
-  {de:"Donnerstag",en:"Thursday",es:"jueves"},{de:"Freitag",en:"Friday",es:"viernes"},
-  {de:"Samstag",en:"Saturday",es:"sábado"},{de:"Sonntag",en:"Sunday",es:"domingo"},
-  {de:"Januar",en:"January",es:"enero"},{de:"Februar",en:"February",es:"febrero"},
-  {de:"März",en:"March",es:"marzo"},{de:"April",en:"April",es:"abril"},
-  {de:"Mai",en:"May",es:"mayo"},{de:"Juni",en:"June",es:"junio"},
-  {de:"Juli",en:"July",es:"julio"},{de:"August",en:"August",es:"agosto"},
-  {de:"September",en:"September",es:"septiembre"},{de:"Oktober",en:"October",es:"octubre"},
-  {de:"November",en:"November",es:"noviembre"},{de:"Dezember",en:"December",es:"diciembre"},
-  {de:"Küche",en:"kitchen",es:"cocina"},{de:"Badezimmer",en:"bathroom",es:"baño"},
-  {de:"Schlafzimmer",en:"bedroom",es:"dormitorio"},{de:"Garten",en:"garden",es:"jardín"},
-  {de:"Straße",en:"street",es:"calle"},{de:"Markt",en:"market",es:"mercado"},
-  {de:"Supermarkt",en:"supermarket",es:"supermercado"},{de:"Bäckerei",en:"bakery",es:"panadería"},
-  {de:"Restaurant",en:"restaurant",es:"restaurante"},{de:"Café",en:"café",es:"café"},
-  {de:"Apotheke",en:"pharmacy",es:"farmacia"},{de:"Bank",en:"bank",es:"banco"},
-  {de:"Bibliothek",en:"library",es:"biblioteca"},{de:"Flughafen",en:"airport",es:"aeropuerto"},
-  {de:"Bahnhof",en:"train station",es:"estación"},{de:"Zug",en:"train",es:"tren"},
-  {de:"Bus",en:"bus",es:"autobús"},{de:"Flugzeug",en:"airplane",es:"avión"},
-  {de:"Schiff",en:"ship",es:"barco"},{de:"Fahrrad",en:"bicycle",es:"bicicleta"},
-  {de:"Telefon",en:"telephone",es:"teléfono"},{de:"Computer",en:"computer",es:"ordenador"},
-  {de:"Schlüssel",en:"key",es:"llave"},{de:"Brille",en:"glasses",es:"gafas"},
-  {de:"Uhr",en:"clock",es:"reloj"},{de:"Tasche",en:"bag",es:"bolso"},
-  {de:"Schuhe",en:"shoes",es:"zapatos"},{de:"Hemd",en:"shirt",es:"camisa"},
-  {de:"Hose",en:"trousers",es:"pantalón"},{de:"Jacke",en:"jacket",es:"chaqueta"},
-],
-intermediate:[
-  {de:"Freiheit",en:"freedom",es:"libertad"},{de:"Gerechtigkeit",en:"justice",es:"justicia"},
-  {de:"Regierung",en:"government",es:"gobierno"},{de:"Wissenschaft",en:"science",es:"ciencia"},
-  {de:"Gesellschaft",en:"society",es:"sociedad"},{de:"Bildung",en:"education",es:"educación"},
-  {de:"Umwelt",en:"environment",es:"medio ambiente"},{de:"Wirtschaft",en:"economy",es:"economía"},
-  {de:"Reise",en:"journey",es:"viaje"},{de:"Erfahrung",en:"experience",es:"experiencia"},
-  {de:"Entwicklung",en:"development",es:"desarrollo"},{de:"Verantwortung",en:"responsibility",es:"responsabilidad"},
-  {de:"Entscheidung",en:"decision",es:"decisión"},{de:"Beziehung",en:"relationship",es:"relación"},
-  {de:"Vertrauen",en:"trust",es:"confianza"},{de:"Kenntnis",en:"knowledge",es:"conocimiento"},
-  {de:"Fähigkeit",en:"ability",es:"habilidad"},{de:"Erfolg",en:"success",es:"éxito"},
-  {de:"Niederlage",en:"defeat",es:"derrota"},{de:"Wahrnehmung",en:"perception",es:"percepción"},
-  {de:"Fortschritt",en:"progress",es:"progreso"},{de:"Nachhaltigkeit",en:"sustainability",es:"sostenibilidad"},
-  {de:"Bewusstsein",en:"awareness",es:"conciencia"},{de:"Herausforderung",en:"challenge",es:"desafío"},
-  {de:"Gleichgewicht",en:"balance",es:"equilibrio"},{de:"Einfluss",en:"influence",es:"influencia"},
-  {de:"Verpflichtung",en:"commitment",es:"compromiso"},{de:"Widerstand",en:"resistance",es:"resistencia"},
-  {de:"Vereinbarung",en:"agreement",es:"acuerdo"},{de:"Meinungsverschiedenheit",en:"disagreement",es:"desacuerdo"},
-  {de:"Zusammenarbeit",en:"cooperation",es:"cooperación"},{de:"Gemeinschaft",en:"community",es:"comunidad"},
-  {de:"Netzwerk",en:"network",es:"red"},{de:"Strategie",en:"strategy",es:"estrategia"},
-  {de:"Innovation",en:"innovation",es:"innovación"},{de:"Technologie",en:"technology",es:"tecnología"},
-  {de:"Forschung",en:"research",es:"investigación"},{de:"Analyse",en:"analysis",es:"análisis"},
-  {de:"Lösung",en:"solution",es:"solución"},{de:"Risiko",en:"risk",es:"riesgo"},
-  {de:"Chance",en:"opportunity",es:"oportunidad"},{de:"Wachstum",en:"growth",es:"crecimiento"},
-  {de:"Investition",en:"investment",es:"inversión"},{de:"Steuer",en:"tax",es:"impuesto"},
-  {de:"Vertrag",en:"contract",es:"contrato"},{de:"Gesetz",en:"law",es:"ley"},
-  {de:"Recht",en:"right",es:"derecho"},{de:"Pflicht",en:"duty",es:"deber"},
-  {de:"Bürger",en:"citizen",es:"ciudadano"},{de:"Demokratie",en:"democracy",es:"democracia"},
-  {de:"Wahl",en:"election",es:"elección"},{de:"Partei",en:"party",es:"partido"},
-  {de:"Botschaft",en:"embassy",es:"embajada"},{de:"Grenze",en:"border",es:"frontera"},
-  {de:"Flüchtling",en:"refugee",es:"refugiado"},{de:"Migration",en:"migration",es:"migración"},
-  {de:"Integration",en:"integration",es:"integración"},{de:"Kultur",en:"culture",es:"cultura"},
-  {de:"Tradition",en:"tradition",es:"tradición"},{de:"Sprache",en:"language",es:"idioma"},
-  {de:"Geschichte",en:"history",es:"historia"},{de:"Kunst",en:"art",es:"arte"},
-  {de:"Musik",en:"music",es:"música"},{de:"Theater",en:"theatre",es:"teatro"},
-  {de:"Roman",en:"novel",es:"novela"},{de:"Gedicht",en:"poem",es:"poema"},
-  {de:"Journalist",en:"journalist",es:"periodista"},{de:"Arzt",en:"doctor",es:"médico"},
-  {de:"Anwalt",en:"lawyer",es:"abogado"},{de:"Ingenieur",en:"engineer",es:"ingeniero"},
-  {de:"Lehrer",en:"teacher",es:"profesor"},{de:"Forscher",en:"researcher",es:"investigador"},
-  {de:"Unternehmer",en:"entrepreneur",es:"empresario"},{de:"Mitarbeiter",en:"employee",es:"empleado"},
-  {de:"Kunde",en:"customer",es:"cliente"},{de:"Konkurrent",en:"competitor",es:"competidor"},
-  {de:"Umsatz",en:"revenue",es:"ingresos"},{de:"Gewinn",en:"profit",es:"beneficio"},
-  {de:"Verlust",en:"loss",es:"pérdida"},{de:"Schulden",en:"debt",es:"deuda"},
-  {de:"Kredit",en:"credit",es:"crédito"},{de:"Aktie",en:"share",es:"acción"},
-  {de:"Versicherung",en:"insurance",es:"seguro"},{de:"Gehalt",en:"salary",es:"salario"},
-  {de:"Bewerbung",en:"application",es:"solicitud"},{de:"Kündigung",en:"dismissal",es:"despido"},
-  {de:"Urlaub",en:"vacation",es:"vacaciones"},{de:"Konferenz",en:"conference",es:"conferencia"},
-  {de:"Präsentation",en:"presentation",es:"presentación"},{de:"Bericht",en:"report",es:"informe"},
-  {de:"Projekt",en:"project",es:"proyecto"},{de:"Frist",en:"deadline",es:"plazo"},
-  {de:"Sitzung",en:"meeting",es:"reunión"},{de:"Abteilung",en:"department",es:"departamento"},
-  {de:"Vorstand",en:"board",es:"consejo"},{de:"Geschäftsführer",en:"CEO",es:"director ejecutivo"},
-  {de:"Aktionär",en:"shareholder",es:"accionista"},{de:"Fusion",en:"merger",es:"fusión"},
-  {de:"Konkurs",en:"bankruptcy",es:"quiebra"},{de:"Börse",en:"stock exchange",es:"bolsa"},
-],
-expert:[
-  {de:"Epistemologie",en:"epistemology",es:"epistemología"},{de:"Phänomenologie",en:"phenomenology",es:"fenomenología"},
-  {de:"Ambiguität",en:"ambiguity",es:"ambigüedad"},{de:"Paradigma",en:"paradigm",es:"paradigma"},
-  {de:"Determinismus",en:"determinism",es:"determinismo"},{de:"Dialektik",en:"dialectic",es:"dialéctica"},
-  {de:"Hegemonie",en:"hegemony",es:"hegemonía"},{de:"Metaphysik",en:"metaphysics",es:"metafísica"},
-  {de:"Pluralismus",en:"pluralism",es:"pluralismo"},{de:"Ästhetik",en:"aesthetics",es:"estética"},
-  {de:"Kausalität",en:"causality",es:"causalidad"},{de:"Ontologie",en:"ontology",es:"ontología"},
-  {de:"Utilitarismus",en:"utilitarianism",es:"utilitarismo"},{de:"Souveränität",en:"sovereignty",es:"soberanía"},
-  {de:"Imperativ",en:"imperative",es:"imperativo"},{de:"Axiom",en:"axiom",es:"axioma"},
-  {de:"Kontingenz",en:"contingency",es:"contingencia"},{de:"Tautologie",en:"tautology",es:"tautología"},
-  {de:"Divergenz",en:"divergence",es:"divergencia"},{de:"Resilienz",en:"resilience",es:"resiliencia"},
-  {de:"Subsidiarität",en:"subsidiarity",es:"subsidiariedad"},{de:"Syllogismus",en:"syllogism",es:"silogismo"},
-  {de:"Transzendenz",en:"transcendence",es:"trascendencia"},{de:"Pragmatismus",en:"pragmatism",es:"pragmatismo"},
-  {de:"Relativismus",en:"relativism",es:"relativismo"},{de:"Kognition",en:"cognition",es:"cognición"},
-  {de:"Deduktion",en:"deduction",es:"deducción"},{de:"Induktion",en:"induction",es:"inducción"},
-  {de:"Postulat",en:"postulate",es:"postulado"},{de:"Antithese",en:"antithesis",es:"antítesis"},
-  {de:"Hypothese",en:"hypothesis",es:"hipótesis"},{de:"Synthese",en:"synthesis",es:"síntesis"},
-  {de:"Abstraktion",en:"abstraction",es:"abstracción"},{de:"Analogie",en:"analogy",es:"analogía"},
-  {de:"Paradoxon",en:"paradox",es:"paradoja"},{de:"Kohärenz",en:"coherence",es:"coherencia"},
-  {de:"Konsistenz",en:"consistency",es:"consistencia"},{de:"Korrelation",en:"correlation",es:"correlación"},
-  {de:"Konvergenz",en:"convergence",es:"convergencia"},{de:"Kontroverse",en:"controversy",es:"controversia"},
-  {de:"Konsens",en:"consensus",es:"consenso"},{de:"Legitimität",en:"legitimacy",es:"legitimidad"},
-  {de:"Autorität",en:"authority",es:"autoridad"},{de:"Hierarchie",en:"hierarchy",es:"jerarquía"},
-  {de:"Bürokratie",en:"bureaucracy",es:"burocracia"},{de:"Ideologie",en:"ideology",es:"ideología"},
-  {de:"Utopie",en:"utopia",es:"utopía"},{de:"Anarchie",en:"anarchy",es:"anarquía"},
-  {de:"Totalitarismus",en:"totalitarianism",es:"totalitarismo"},{de:"Liberalismus",en:"liberalism",es:"liberalismo"},
-  {de:"Konservatismus",en:"conservatism",es:"conservadurismo"},{de:"Sozialismus",en:"socialism",es:"socialismo"},
-  {de:"Kapitalismus",en:"capitalism",es:"capitalismo"},{de:"Globalisierung",en:"globalization",es:"globalización"},
-  {de:"Nationalismus",en:"nationalism",es:"nacionalismo"},{de:"Imperialismus",en:"imperialism",es:"imperialismo"},
-  {de:"Kolonialismus",en:"colonialism",es:"colonialismo"},{de:"Diskriminierung",en:"discrimination",es:"discriminación"},
-  {de:"Emanzipation",en:"emancipation",es:"emancipación"},{de:"Feminismus",en:"feminism",es:"feminismo"},
-  {de:"Ökologie",en:"ecology",es:"ecología"},{de:"Biodiversität",en:"biodiversity",es:"biodiversidad"},
-  {de:"Klimawandel",en:"climate change",es:"cambio climático"},{de:"Quantenmechanik",en:"quantum mechanics",es:"mecánica cuántica"},
-  {de:"Neurologie",en:"neurology",es:"neurología"},{de:"Psychoanalyse",en:"psychoanalysis",es:"psicoanálisis"},
-  {de:"Behaviourismus",en:"behaviourism",es:"conductismo"},{de:"Kognitionswissenschaft",en:"cognitive science",es:"ciencia cognitiva"},
-  {de:"Linguistik",en:"linguistics",es:"lingüística"},{de:"Semiotik",en:"semiotics",es:"semiótica"},
-  {de:"Hermeneutik",en:"hermeneutics",es:"hermenéutica"},{de:"Dekonstruktion",en:"deconstruction",es:"deconstrucción"},
-  {de:"Postmodernismus",en:"postmodernism",es:"posmodernismo"},{de:"Strukturalismus",en:"structuralism",es:"estructuralismo"},
-  {de:"Existenzialismus",en:"existentialism",es:"existencialismo"},{de:"Stoizismus",en:"stoicism",es:"estoicismo"},
-  {de:"Empirismus",en:"empiricism",es:"empirismo"},{de:"Rationalismus",en:"rationalism",es:"racionalismo"},
-  {de:"Skeptizismus",en:"scepticism",es:"escepticismo"},{de:"Nihilismus",en:"nihilism",es:"nihilismo"},
-  {de:"Agnostizismus",en:"agnosticism",es:"agnosticismo"},{de:"Atheismus",en:"atheism",es:"ateísmo"},
-  {de:"Theismus",en:"theism",es:"teísmo"},{de:"Pantheismus",en:"pantheism",es:"panteísmo"},
-  {de:"Mystizismus",en:"mysticism",es:"misticismo"},{de:"Eschatologie",en:"eschatology",es:"escatología"},
-  {de:"Theodizee",en:"theodicy",es:"teodicea"},{de:"Phänomen",en:"phenomenon",es:"fenómeno"},
-  {de:"Dialektisch",en:"dialectical",es:"dialéctico"},{de:"Apriori",en:"a priori",es:"a priori"},
-  {de:"Aposteriori",en:"a posteriori",es:"a posteriori"},{de:"Noumenon",en:"noumenon",es:"noúmeno"},
-  {de:"Immanenz",en:"immanence",es:"inmanencia"},{de:"Dualismus",en:"dualism",es:"dualismo"},
-  {de:"Monismus",en:"monism",es:"monismo"},{de:"Reduktionismus",en:"reductionism",es:"reduccionismo"},
-  {de:"Holismus",en:"holism",es:"holismo"},{de:"Teleologie",en:"teleology",es:"teleología"},
-]
-};
+const VOCAB = window.VOCAB;
 
-const LANG_NAMES={de:"Deutsch 🇩🇪",en:"Englisch 🇬🇧",es:"Spanisch 🇪🇸"};
-const LANG_BCP={de:"de-DE",en:"en-GB",es:"es-ES"};
+const LANG_NAMES={de:"Deutsch 🇩🇪",en:"Englisch 🇬🇧",es:"Spanisch 🇪🇸",it:"Italienisch 🇮🇹"};
+const LANG_BCP={de:"de-DE",en:"en-GB",es:"es-ES",it:"it-IT"};
 const LEVEL_NAMES={beginner:"Beginner",intermediate:"Fortgeschritten",expert:"Experte",problems:"Problemwörter"};
 const MSGS=[[5,"🏆 Perfekt!","Alle 5 richtig — fantastisch!"],[4,"🌟 Ausgezeichnet!","Fast perfekt!"],[3,"👍 Gut gemacht!","Mehr als die Hälfte!"],[2,"📖 Weiter üben!","Du schaffst das!"],[0,"💪 Nicht aufgeben!","Übung macht den Meister!"]];
 
@@ -574,10 +439,84 @@ let session={words:[],answers:[],submitted:false};
 let usedIdx={beginner:new Set(),intermediate:new Set(),expert:new Set()};
 let currentTab='quiz'; // 'quiz' | 'stats'
 
+// ── CLOUD SYNC (Supabase) ───────────────────────────
+// 1. Erstelle kostenlos ein Projekt auf https://supabase.com
+// 2. Trage unten deine Projekt-URL und den "anon public" Key ein
+//    (Projekteinstellungen → API)
+// 3. Führe im Supabase SQL-Editor aus:
+//
+//    create table user_progress (
+//      user_id uuid primary key references auth.users(id) on delete cascade,
+//      stats jsonb not null default '{}'::jsonb,
+//      updated_at timestamptz not null default now()
+//    );
+//    alter table user_progress enable row level security;
+//    create policy "own row" on user_progress
+//      for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+//
+// 4. Aktiviere in Supabase unter Authentication → Providers "Email" (Magic Link).
+const SUPABASE_URL = https://cpkymansglprkskahkpu.supabase.co/rest/v1/;
+const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3ltYW5zZ2xwcmtza2Foa3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDg1NjAsImV4cCI6MjEwMTkyNDU2MH0.exOEoZ-DINBKIzaelWsYPbWFSGKR5Kd0S_BjRC-EJfE;
+const cloudEnabled = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 10;
+let sb = null, cloudUser = null;
+if (cloudEnabled && window.supabase) {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+async function initCloud(){
+  if(!cloudEnabled || !sb) return;
+  document.getElementById('sync-card').style.display = 'block';
+  const { data:{ session } } = await sb.auth.getSession();
+  await handleAuthState(session);
+  sb.auth.onAuthStateChange(async (_event, session) => { await handleAuthState(session); });
+}
+
+async function handleAuthState(session){
+  if(session && session.user){
+    cloudUser = session.user;
+    document.getElementById('sync-logged-out').style.display = 'none';
+    document.getElementById('sync-logged-in').style.display = 'block';
+    document.getElementById('sync-user-email').textContent = cloudUser.email || '';
+    const { data } = await sb.from('user_progress').select('stats').eq('user_id', cloudUser.id).maybeSingle();
+    if(data && data.stats && Object.keys(data.stats).length){
+      stats = data.stats;
+    } else {
+      await pushStatsToCloud();
+    }
+    localStorage.setItem('vk3_stats', JSON.stringify(stats));
+    if(currentTab==='stats') renderStats();
+  } else {
+    cloudUser = null;
+    document.getElementById('sync-logged-out').style.display = 'block';
+    document.getElementById('sync-logged-in').style.display = 'none';
+  }
+}
+
+async function sendMagicLink(){
+  const email = document.getElementById('sync-email').value.trim();
+  const statusEl = document.getElementById('sync-status');
+  if(!email){ statusEl.textContent = 'Bitte E-Mail eingeben.'; return; }
+  statusEl.textContent = 'Sende Link …';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+  statusEl.textContent = error ? 'Fehler: '+error.message : '✓ Link gesendet — E-Mail öffnen, um dich anzumelden.';
+}
+
+async function signOutCloud(){
+  if(sb) await sb.auth.signOut();
+}
+
+async function pushStatsToCloud(){
+  if(!cloudEnabled || !sb || !cloudUser) return;
+  await sb.from('user_progress').upsert({ user_id: cloudUser.id, stats, updated_at: new Date().toISOString() });
+}
+
 // ── STATS ──────────────────────────────────────────
 function initStats(){return{versuche:0,richtig:0,falsch:0,wrongWords:{},history:[]};}
 function loadStats(){try{return JSON.parse(localStorage.getItem('vk3_stats'))||initStats();}catch{return initStats();}}
-function saveStats(){localStorage.setItem('vk3_stats',JSON.stringify(stats));}
+function saveStats(){
+  localStorage.setItem('vk3_stats',JSON.stringify(stats));
+  if(cloudUser) pushStatsToCloud();
+}
 let stats=loadStats();
 
 // ── SPEECH ─────────────────────────────────────────
@@ -822,7 +761,7 @@ function showResults(correct,results){
     qLine.textContent=r.word+' ';
     const sbQ=mkSpeak('btn-speak-sm');sbQ.addEventListener('click',()=>speak(r.word,cfg.from,sbQ));
     qLine.appendChild(sbQ);
-    const aLine=document.createElement('div');aLine.className='result-a';
+    const aLine=document.createElement('div');aLine.className='result-a '+(r.ok?'ok':'err');
     aLine.innerHTML=r.user||'<em style="color:var(--muted)">—</em>';
     left.appendChild(qLine);left.appendChild(aLine);
     if(!r.ok){
@@ -883,8 +822,21 @@ const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
 if(isIOS&&!window.navigator.standalone)document.getElementById('install-banner').style.display='block';
 
 // ── INIT ───────────────────────────────────────────
+if (!window.VOCAB) {
+  document.body.innerHTML = '<div style="padding:30px 20px;font-family:sans-serif;color:#fff;background:#1a1a2e;min-height:100vh;">'
+    + '<h2 style="color:#f87171;">⚠️ Vokabeldaten fehlen</h2>'
+    + '<p>Die Datei <code>vocab-data.js</code> konnte nicht geladen werden.</p>'
+    + '<p>Bitte stelle sicher, dass <code>vocab-data.js</code> im selben Ordner wie <code>index.html</code> liegt (exakt so benannt, ohne Zusatz wie "(1)").</p>'
+    + '<p style="color:#94a3b8;font-size:.85rem;margin-top:16px;">Öffne die Entwicklerkonsole → Netzwerk-Tab beim Neuladen, um den genauen Fehler (z. B. 404) zu sehen.</p>'
+    + '</div>';
+  throw new Error('vocab-data.js nicht geladen — window.VOCAB fehlt');
+}
+document.getElementById('cnt-beginner').textContent = VOCAB.beginner.length;
+document.getElementById('cnt-intermediate').textContent = VOCAB.intermediate.length;
+document.getElementById('cnt-expert').textContent = VOCAB.expert.length;
 checkCfg();
 updateProblemBadge();
+initCloud();
 </script>
 </body>
 </html>
