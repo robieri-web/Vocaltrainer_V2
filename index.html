@@ -1,1 +1,843 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vokabeln">
+<meta name="theme-color" content="#0c0e16">
+<title>Vokabeltrainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="vocab-data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ─── RESET ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
+:root{
+  --bg:#0c0e16; --s1:#13151f; --s2:#1c1f2e; --s3:#252839;
+  --border:#2e3148; --accent:#4f8ef7; --accent2:#7dd3fc;
+  --gold:#fbbf24; --green:#34d399; --red:#f87171;
+  --text:#e8eaf6; --muted:#7880a4; --r:14px;
+  --nav-h: 60px;
+  --top-h: 54px;
+}
+
+html, body {
+  /* KEY iOS FIX: body must NOT be overflow:hidden.
+     We use position:fixed + full-height pages instead. */
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+
+body {
+  background-image: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(79,142,247,.1) 0%, transparent 70%);
+}
+
+/* ─── FIXED TOP BAR ─────────────────────────────────── */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  top: env(safe-area-inset-top, 0);
+  height: var(--top-h);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 100;
+}
+.logo { font-family:'Fraunces',serif; font-size:1.4rem; font-weight:900; letter-spacing:-.5px; }
+.logo span { color: var(--accent); }
+
+/* ─── FIXED BOTTOM NAV ──────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  /* account for iPhone home indicator */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  background: var(--s1);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+}
+.nav-item {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  padding: 10px 0 8px;
+  border: none; background: transparent;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: .63rem; font-weight: 500;
+  cursor: pointer;
+  -webkit-user-select: none;
+}
+.nav-item.active { color: var(--accent); }
+.nav-item .icon { font-size: 1.3rem; line-height: 1; }
+
+/* ─── PAGE SYSTEM ───────────────────────────────────── */
+/*
+  CRITICAL iOS PWA FIX:
+  Each page is a normal block-level div that scrolls with
+  the window. No overflow:hidden ancestors.
+  We show/hide pages by display:none / display:block.
+  The body itself scrolls — this is the only reliable
+  way to get iOS software keyboard + input focus working
+  in a PWA.
+*/
+.page {
+  display: none;
+  min-height: 100vh;
+  padding-top: calc(var(--top-h) + env(safe-area-inset-top, 0px) + 12px);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 24px);
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.page.active { display: block; }
+
+/* ─── CARDS ─────────────────────────────────────────── */
+.card { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); padding:16px; margin-bottom:12px; }
+.card-label { font-size:.63rem; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:12px; }
+
+/* ─── LANGUAGE BUTTONS ──────────────────────────────── */
+.lang-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.lang-btn {
+  background:var(--s2); border:1.5px solid var(--border); border-radius:12px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:12px 4px;
+  font-family:'DM Sans',sans-serif; font-size:.75rem; font-weight:500;
+  color:var(--muted); cursor:pointer; -webkit-user-select:none;
+  transition: all .15s;
+}
+.lang-btn .flag { font-size:1.8rem; }
+.lang-btn.selected { border-color:var(--accent); background:rgba(79,142,247,.1); color:var(--accent2); }
+
+/* ─── LEVEL BUTTONS ─────────────────────────────────── */
+.level-btn {
+  background:var(--s2); border:1.5px solid var(--border); border-radius:12px;
+  display:block; width:100%; text-align:left; padding:13px 15px; margin-bottom:8px;
+  font-family:'DM Sans',sans-serif; color:var(--text);
+  cursor:pointer; -webkit-user-select:none; transition:all .15s;
+}
+.level-btn .ln { font-size:.92rem; font-weight:600; }
+.level-btn .ld { font-size:.7rem; color:var(--muted); margin-top:3px; }
+.level-btn.selected { border-color:var(--accent); background:rgba(79,142,247,.1); }
+.level-btn.selected .ld { color:rgba(125,211,252,.7); }
+
+.problem-btn {
+  background:rgba(248,113,113,.07); border:1.5px solid rgba(248,113,113,.3); border-radius:12px;
+  display:block; width:100%; text-align:left; padding:13px 15px; margin-bottom:8px;
+  font-family:'DM Sans',sans-serif; cursor:pointer; -webkit-user-select:none; transition:all .15s;
+}
+.problem-btn .ln { font-size:.92rem; font-weight:600; color:var(--red); }
+.problem-btn .ld { font-size:.7rem; color:var(--muted); margin-top:3px; }
+.problem-btn.selected { border-color:var(--red); background:rgba(248,113,113,.15); }
+.problem-count { display:inline-flex; align-items:center; justify-content:center; background:var(--red); color:#fff; border-radius:99px; font-size:.65rem; font-weight:700; padding:1px 7px; margin-left:6px; }
+
+/* ─── BUTTONS ───────────────────────────────────────── */
+.btn-primary {
+  background:var(--accent); border:none; border-radius:14px; color:#fff;
+  font-family:'DM Sans',sans-serif; font-size:1rem; font-weight:600;
+  padding:16px; width:100%; margin-top:4px;
+  -webkit-user-select:none; cursor:pointer; transition:opacity .15s;
+}
+.btn-primary:active { opacity:.75; }
+.btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+.btn-ghost {
+  background:transparent; border:1px solid var(--border); border-radius:12px;
+  color:var(--muted); font-family:'DM Sans',sans-serif; font-size:.85rem;
+  padding:12px; width:100%; margin-top:8px;
+  cursor:pointer; -webkit-user-select:none;
+}
+
+/* ─── PROGRESS BAR ──────────────────────────────────── */
+.progress { height:3px; background:var(--border); border-radius:99px; margin-bottom:14px; overflow:hidden; }
+.progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .5s ease; }
+
+/* ─── QUIZ ROW ───────────────────────────────────────── */
+.quiz-row { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:12px; }
+.qr-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.qr-left { display:flex; align-items:baseline; gap:6px; flex:1; flex-wrap:wrap; }
+.qr-num { font-size:.68rem; color:var(--muted); font-weight:600; flex-shrink:0; }
+.qr-word { font-family:'Fraunces',serif; font-size:1.4rem; font-weight:700; line-height:1.1; }
+.qr-tag { font-size:.58rem; color:var(--muted); background:var(--s2); border:1px solid var(--border); border-radius:99px; padding:1px 6px; }
+
+/*
+  CRITICAL iOS INPUT FIX:
+  1. font-size must be >= 16px to prevent Safari auto-zoom
+  2. -webkit-appearance:none removes iOS default styling
+  3. No position:relative/absolute hacks on the container
+  4. Input must be a direct child of a non-overflow:hidden parent
+*/
+.quiz-input-wrap { display:flex; align-items:center; gap:10px; }
+.quiz-input {
+  flex: 1;
+  background: var(--s2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;          /* prevents iOS zoom */
+  line-height: 1.4;
+  padding: 12px 14px;
+  min-height: 48px;         /* Apple HIG min touch target */
+  width: 100%;
+  outline: none;
+  -webkit-appearance: none; /* removes iOS inset shadow */
+  appearance: none;
+  /* NO transform, NO position:relative on parent = iOS can focus */
+}
+.quiz-input:focus { border-color: var(--accent); }
+.quiz-input.ok  { border-color: var(--green); background: rgba(52,211,153,.08); color: var(--green); font-weight:600; }
+.quiz-input.err { border-color: var(--red);   background: rgba(248,113,113,.08); color: var(--red); font-weight:600; }
+.quiz-input:disabled { opacity: .8; color: var(--text); }
+
+.correction {
+  display:flex; align-items:center; gap:8px;
+  font-size:.82rem; color:var(--green);
+  margin-top:10px; padding:8px 12px;
+  background:rgba(52,211,153,.07); border-radius:8px;
+}
+
+/* ─── SPEAK BUTTONS ─────────────────────────────────── */
+.btn-speak {
+  display:flex; align-items:center; justify-content:center;
+  background:var(--s2); border:1.5px solid var(--border); border-radius:10px;
+  color:var(--accent2);
+  min-width:48px; min-height:48px;
+  font-size:1.15rem; flex-shrink:0;
+  cursor:pointer; -webkit-user-select:none;
+  transition:all .15s;
+}
+.btn-speak:active { background:rgba(79,142,247,.2); }
+.btn-speak.speaking { border-color:var(--accent2); background:rgba(125,211,252,.15); animation:pulse .7s ease-in-out infinite alternate; }
+@keyframes pulse { from{box-shadow:0 0 0 0 rgba(125,211,252,.5)} to{box-shadow:0 0 0 8px rgba(125,211,252,0)} }
+
+.btn-speak-sm {
+  display:inline-flex; align-items:center; justify-content:center;
+  background:rgba(125,211,252,.1); border:1px solid rgba(125,211,252,.2); border-radius:7px;
+  color:var(--accent2); font-size:.82rem;
+  min-width:30px; min-height:30px;
+  flex-shrink:0; cursor:pointer;
+}
+
+/* ─── BADGES ────────────────────────────────────────── */
+.badge { display:inline-flex; align-items:center; gap:3px; font-size:.68rem; font-weight:600; padding:3px 9px; border-radius:99px; }
+.badge.ok  { background:rgba(52,211,153,.12);  color:var(--green); border:1px solid rgba(52,211,153,.25); }
+.badge.err { background:rgba(248,113,113,.12); color:var(--red);   border:1px solid rgba(248,113,113,.25); }
+
+/* ─── SCORE RING ────────────────────────────────────── */
+.score-ring-wrap { display:flex; flex-direction:column; align-items:center; padding:24px 16px 14px; }
+.ring-outer { position:relative; width:130px; height:130px; margin-bottom:12px; }
+.ring-outer svg { position:absolute; top:0; left:0; transform:rotate(-90deg); }
+.ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ring-pct { font-family:'Fraunces',serif; font-size:2.2rem; font-weight:900; line-height:1; }
+.ring-lbl { font-size:.62rem; color:var(--muted); }
+.score-title { font-family:'Fraunces',serif; font-size:1.35rem; font-weight:700; text-align:center; }
+.score-msg { font-size:.82rem; color:var(--muted); text-align:center; margin-top:4px; }
+.score-badges { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+
+/* ─── RESULT ROWS ───────────────────────────────────── */
+.result-row { padding:11px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.result-row:last-child { border:none; }
+.result-left { flex:1; min-width:0; }
+.result-q { font-size:.67rem; color:var(--muted); display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+.result-a { font-size:.93rem; word-break:break-word; }
+.result-a.ok  { color: var(--green); font-weight:600; }
+.result-a.err { color: var(--red);   font-weight:600; }
+
+/* ─── STATS ─────────────────────────────────────────── */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.stat-box { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:16px; text-align:center; }
+.stat-n { font-family:'Fraunces',serif; font-size:1.9rem; font-weight:900; line-height:1; }
+.stat-l { font-size:.67rem; color:var(--muted); margin-top:5px; }
+.stat-green{color:var(--green)} .stat-red{color:var(--red)} .stat-gold{color:var(--gold)} .stat-blue{color:var(--accent2)}
+
+.hist-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+.hist-table th { color:var(--muted); font-weight:500; text-align:left; padding:5px 3px; border-bottom:1px solid var(--border); }
+.hist-table td { padding:7px 3px; border-bottom:1px solid rgba(46,49,72,.4); }
+.hist-table tr:last-child td { border:none; }
+
+.wrong-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); gap:10px; }
+.wrong-row:last-child { border:none; }
+.wrong-word { font-size:.88rem; font-weight:500; }
+.wrong-meta { font-size:.68rem; color:var(--muted); margin-top:2px; }
+
+/* ─── ALERTS ────────────────────────────────────────── */
+.alert { background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.2); border-radius:12px; padding:10px 14px; font-size:.78rem; color:var(--gold); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.install-banner { background:linear-gradient(135deg,rgba(79,142,247,.12),rgba(125,211,252,.08)); border:1px solid rgba(79,142,247,.25); border-radius:12px; padding:12px 14px; font-size:.76rem; color:var(--accent2); margin-bottom:14px; }
+.install-banner strong { display:block; font-size:.8rem; margin-bottom:3px; }
+
+.anim { animation: fadeUp .22s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- FIXED TOP BAR -->
+<div class="topbar">
+  <div class="logo">Vokabel<span>trainer</span></div>
+</div>
+
+<!-- ══════ PAGE: SETUP ══════ -->
+<div class="page active" id="page-setup">
+
+  <div class="install-banner" id="install-banner" style="display:none">
+    <strong>💡 Als App installieren</strong>
+    Safari → Teilen → <strong>„Zum Home-Bildschirm"</strong>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Fragensprache — diese Wörter sehe ich</div>
+    <div class="lang-grid">
+      <button class="lang-btn selected" onclick="pick('from','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
+      <button class="lang-btn" onclick="pick('from','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
+      <button class="lang-btn" onclick="pick('from','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+      <button class="lang-btn" onclick="pick('from','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Antwortsprache — in diese Sprache übersetze ich</div>
+    <div class="lang-grid">
+      <button class="lang-btn" onclick="pick('to','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
+      <button class="lang-btn selected" onclick="pick('to','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
+      <button class="lang-btn" onclick="pick('to','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
+      <button class="lang-btn" onclick="pick('to','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Kategorie / Schwierigkeitsstufe</div>
+    <button class="level-btn selected" onclick="pickLevel('beginner',this)">
+      <div class="ln">🌱 Beginner</div>
+      <div class="ld"><span id="cnt-beginner">…</span> Wörter · Alltag, Farben, Zahlen, Familie</div>
+    </button>
+    <button class="level-btn" onclick="pickLevel('intermediate',this)">
+      <div class="ln">📚 Fortgeschritten</div>
+      <div class="ld"><span id="cnt-intermediate">…</span> Wörter · Gesellschaft, Reisen, Berufe</div>
+    </button>
+    <button class="level-btn" onclick="pickLevel('expert',this)">
+      <div class="ln">🎓 Experte</div>
+      <div class="ld"><span id="cnt-expert">…</span> Wörter · Politik, Wirtschaft, Wissenschaft</div>
+    </button>
+    <button class="problem-btn" id="problem-level-btn" onclick="pickLevel('problems',this)">
+      <div class="ln">❌ Problemwörter <span class="problem-count" id="problem-count-badge">0</span></div>
+      <div class="ld">Nur falsch beantwortete Wörter üben</div>
+    </button>
+  </div>
+
+  <div class="alert" id="wrong-alert" style="display:none">
+    ⚠️ <span><span id="wrong-count-info">0</span> Problemwörter können auftauchen</span>
+  </div>
+
+  <button class="btn-primary" id="start-btn" onclick="startQuiz()">Quiz starten (5 Wörter) →</button>
+</div>
+
+<!-- ══════ PAGE: QUIZ ══════ -->
+<div class="page" id="page-quiz">
+  <div class="progress"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  <div id="quiz-rows"></div>
+  <button class="btn-primary" id="submit-btn" onclick="submitAll()">Antworten prüfen →</button>
+  <button class="btn-ghost" onclick="goSetup()">← Zurück</button>
+</div>
+
+<!-- ══════ PAGE: RESULTS ══════ -->
+<div class="page" id="page-results">
+  <div class="score-ring-wrap">
+    <div class="ring-outer">
+      <svg width="130" height="130" viewBox="0 0 130 130">
+        <circle cx="65" cy="65" r="54" fill="none" stroke="var(--s3)" stroke-width="10"/>
+        <circle cx="65" cy="65" r="54" fill="none" stroke="var(--accent)" stroke-width="10"
+          stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="339"
+          id="ring-circle" style="transition:stroke-dashoffset .8s ease"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-pct" id="res-pct">—</div>
+        <div class="ring-lbl">Punkte</div>
+      </div>
+    </div>
+    <div class="score-title" id="res-title">—</div>
+    <div class="score-msg" id="res-msg">—</div>
+    <div class="score-badges">
+      <span class="badge ok" id="res-ok">—</span>
+      <span class="badge err" id="res-err">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Alle Antworten</div>
+    <div id="result-detail"></div>
+  </div>
+  <button class="btn-primary" onclick="startQuiz()">Nochmal spielen →</button>
+  <button class="btn-ghost" onclick="goSetup()">← Einstellungen</button>
+</div>
+
+<!-- ══════ PAGE: STATISTIK ══════ -->
+<div class="page" id="page-stats">
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-n stat-blue" id="st-versuche">0</div><div class="stat-l">Versuche</div></div>
+    <div class="stat-box"><div class="stat-n stat-gold" id="st-quote">0%</div><div class="stat-l">Trefferquote</div></div>
+    <div class="stat-box"><div class="stat-n stat-green" id="st-richtig">0</div><div class="stat-l">Richtig</div></div>
+    <div class="stat-box"><div class="stat-n stat-red" id="st-falsch">0</div><div class="stat-l">Falsch</div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">❌ Problemwörter (mehrfach falsch)</div>
+    <div id="st-wrong-list"><span style="color:var(--muted);font-size:.85rem">Noch keine Fehler!</span></div>
+  </div>
+  <div class="card">
+    <div class="card-label">📋 Verlauf</div>
+    <div id="st-history"><span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span></div>
+  </div>
+  <button class="btn-ghost" style="color:var(--red);border-color:rgba(248,113,113,.3);" onclick="resetStats()">🗑 Statistik zurücksetzen</button>
+
+  <div class="card" id="sync-card" style="display:none;">
+    <div class="card-label">☁️ Cloud-Sync</div>
+    <div id="sync-logged-out">
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">Melde dich per E-Mail an, um deinen Fortschritt geräteübergreifend zu synchronisieren.</p>
+      <input type="email" id="sync-email" class="quiz-input" placeholder="deine@email.ch" autocapitalize="none" autocorrect="off" style="margin-bottom:8px;">
+      <button class="btn-primary" style="margin-top:0;" onclick="sendMagicLink()">Login-Link senden</button>
+      <div class="status-msg" id="sync-status" style="font-size:.78rem;color:var(--muted);margin-top:8px;"></div>
+    </div>
+    <div id="sync-logged-in" style="display:none;">
+      <p style="font-size:.82rem;">✅ Angemeldet als <strong id="sync-user-email"></strong></p>
+      <p style="font-size:.75rem;color:var(--muted);margin:4px 0 10px;">Dein Fortschritt wird automatisch synchronisiert.</p>
+      <button class="btn-ghost" onclick="signOutCloud()">Abmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIXED BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="nav-item active" id="nav-quiz" onclick="switchTab('quiz')">
+    <span class="icon">📝</span>Quiz
+  </button>
+  <button class="nav-item" id="nav-stats" onclick="switchTab('stats')">
+    <span class="icon">📊</span>Statistik
+  </button>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// VOCABULARY — loaded from vocab-data.js (window.VOCAB)
+// ════════════════════════════════════════════
+const VOCAB = window.VOCAB;
+
+const LANG_NAMES={de:"Deutsch 🇩🇪",en:"Englisch 🇬🇧",es:"Spanisch 🇪🇸",it:"Italienisch 🇮🇹"};
+const LANG_BCP={de:"de-DE",en:"en-GB",es:"es-ES",it:"it-IT"};
+const LEVEL_NAMES={beginner:"Beginner",intermediate:"Fortgeschritten",expert:"Experte",problems:"Problemwörter"};
+const MSGS=[[5,"🏆 Perfekt!","Alle 5 richtig — fantastisch!"],[4,"🌟 Ausgezeichnet!","Fast perfekt!"],[3,"👍 Gut gemacht!","Mehr als die Hälfte!"],[2,"📖 Weiter üben!","Du schaffst das!"],[0,"💪 Nicht aufgeben!","Übung macht den Meister!"]];
+
+// ── STATE ──────────────────────────────────────────
+let cfg={from:"de",to:"en",level:"beginner"};
+let session={words:[],answers:[],submitted:false};
+let usedIdx={beginner:new Set(),intermediate:new Set(),expert:new Set()};
+let currentTab='quiz'; // 'quiz' | 'stats'
+
+// ── CLOUD SYNC (Supabase) ───────────────────────────
+// 1. Erstelle kostenlos ein Projekt auf https://supabase.com
+// 2. Trage unten deine Projekt-URL und den "anon public" Key ein
+//    (Projekteinstellungen → API)
+// 3. Führe im Supabase SQL-Editor aus:
+//
+//    create table user_progress (
+//      user_id uuid primary key references auth.users(id) on delete cascade,
+//      stats jsonb not null default '{}'::jsonb,
+//      updated_at timestamptz not null default now()
+//    );
+//    alter table user_progress enable row level security;
+//    create policy "own row" on user_progress
+//      for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+//
+// 4. Aktiviere in Supabase unter Authentication → Providers "Email" (Magic Link).
+const SUPABASE_URL = "https://cpkymansglprkskahkpu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3ltYW5zZ2xwcmtza2Foa3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDg1NjAsImV4cCI6MjEwMTkyNDU2MH0.exOEoZ-DINBKIzaelWsYPbWFSGKR5Kd0S_BjRC-EJfE";
+const cloudEnabled = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 10;
+let sb = null, cloudUser = null;
+if (cloudEnabled && window.supabase) {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+async function initCloud(){
+  if(!cloudEnabled || !sb) return;
+  document.getElementById('sync-card').style.display = 'block';
+  const { data:{ session } } = await sb.auth.getSession();
+  await handleAuthState(session);
+  sb.auth.onAuthStateChange(async (_event, session) => { await handleAuthState(session); });
+}
+
+async function handleAuthState(session){
+  if(session && session.user){
+    cloudUser = session.user;
+    document.getElementById('sync-logged-out').style.display = 'none';
+    document.getElementById('sync-logged-in').style.display = 'block';
+    document.getElementById('sync-user-email').textContent = cloudUser.email || '';
+    const { data } = await sb.from('user_progress').select('stats').eq('user_id', cloudUser.id).maybeSingle();
+    if(data && data.stats && Object.keys(data.stats).length){
+      stats = data.stats;
+    } else {
+      await pushStatsToCloud();
+    }
+    localStorage.setItem('vk3_stats', JSON.stringify(stats));
+    if(currentTab==='stats') renderStats();
+  } else {
+    cloudUser = null;
+    document.getElementById('sync-logged-out').style.display = 'block';
+    document.getElementById('sync-logged-in').style.display = 'none';
+  }
+}
+
+async function sendMagicLink(){
+  const email = document.getElementById('sync-email').value.trim();
+  const statusEl = document.getElementById('sync-status');
+  if(!email){ statusEl.textContent = 'Bitte E-Mail eingeben.'; return; }
+  statusEl.textContent = 'Sende Link …';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+  statusEl.textContent = error ? 'Fehler: '+error.message : '✓ Link gesendet — E-Mail öffnen, um dich anzumelden.';
+}
+
+async function signOutCloud(){
+  if(sb) await sb.auth.signOut();
+}
+
+async function pushStatsToCloud(){
+  if(!cloudEnabled || !sb || !cloudUser) return;
+  await sb.from('user_progress').upsert({ user_id: cloudUser.id, stats, updated_at: new Date().toISOString() });
+}
+
+// ── STATS ──────────────────────────────────────────
+function initStats(){return{versuche:0,richtig:0,falsch:0,wrongWords:{},history:[]};}
+function loadStats(){try{return JSON.parse(localStorage.getItem('vk3_stats'))||initStats();}catch{return initStats();}}
+function saveStats(){
+  localStorage.setItem('vk3_stats',JSON.stringify(stats));
+  if(cloudUser) pushStatsToCloud();
+}
+let stats=loadStats();
+
+// ── SPEECH ─────────────────────────────────────────
+let activeSpeakBtn=null;
+function speak(word,lang,btn){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  if(activeSpeakBtn&&activeSpeakBtn!==btn){activeSpeakBtn.classList.remove('speaking');activeSpeakBtn.textContent='🔊';}
+  if(activeSpeakBtn===btn){activeSpeakBtn=null;btn.classList.remove('speaking');btn.textContent='🔊';return;}
+  activeSpeakBtn=btn;btn.classList.add('speaking');btn.textContent='🔉';
+  const u=new SpeechSynthesisUtterance(word);
+  u.lang=LANG_BCP[lang];u.rate=0.88;
+  u.onend=u.onerror=()=>{btn.classList.remove('speaking');btn.textContent='🔊';if(activeSpeakBtn===btn)activeSpeakBtn=null;};
+  speechSynthesis.speak(u);
+}
+
+// ── HELPERS ────────────────────────────────────────
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function norm(s){return s.trim().toLowerCase().replace(/[áàâ]/g,'a').replace(/[éèê]/g,'e').replace(/[íìî]/g,'i').replace(/[óòô]/g,'o').replace(/[úùû]/g,'u').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ä/g,'ae').replace(/ß/g,'ss').replace(/ñ/g,'n');}
+function check(input,correct){const ni=norm(input),nc=norm(correct);return ni===nc||nc.split(' ').some(w=>w===ni);}
+function mkSpeak(cls){const b=document.createElement('button');b.className=cls;b.textContent='🔊';b.type='button';return b;}
+
+// ── PAGE / TAB NAVIGATION ──────────────────────────
+// All pages exist in DOM; we simply show/hide.
+// body scrolls normally — no overflow:hidden anywhere.
+const QUIZ_PAGES=['page-setup','page-quiz','page-results'];
+const ALL_PAGES=[...QUIZ_PAGES,'page-stats'];
+
+function showPage(id){
+  ALL_PAGES.forEach(p=>{
+    const el=document.getElementById(p);
+    el.classList.remove('active','anim');
+  });
+  const el=document.getElementById(id);
+  el.classList.add('active','anim');
+  window.scrollTo(0,0);
+}
+
+function switchTab(name){
+  currentTab=name;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-'+name).classList.add('active');
+  if(name==='stats'){showPage('page-stats');renderStats();}
+  else{showPage('page-setup');updateProblemBadge();}
+}
+
+function goSetup(){showPage('page-setup');updateProblemBadge();}
+
+function pick(type,lang,el){
+  document.querySelectorAll(`[onclick^="pick('${type}"]`).forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');cfg[type]=lang;checkCfg();
+}
+function pickLevel(level,el){
+  document.querySelectorAll('.level-btn,.problem-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');cfg.level=level;checkCfg();
+}
+function checkCfg(){
+  const ok=cfg.from!==cfg.to;
+  const btn=document.getElementById('start-btn');
+  btn.disabled=!ok;
+  if(!ok)btn.textContent='⚠ Verschiedene Sprachen wählen';
+  else if(cfg.level==='problems')btn.textContent='Problemwörter üben →';
+  else btn.textContent='Quiz starten (5 Wörter) →';
+}
+function updateProblemBadge(){
+  const count=getProblemWords().length;
+  document.getElementById('problem-count-badge').textContent=count;
+  const wa=document.getElementById('wrong-alert');
+  if(count>0&&cfg.level!=='problems'){document.getElementById('wrong-count-info').textContent=count;wa.style.display='flex';}
+  else wa.style.display='none';
+}
+
+// ── PROBLEM WORDS ──────────────────────────────────
+function getProblemWords(){
+  const result=[];
+  ['beginner','intermediate','expert'].forEach(lv=>{
+    const ww=stats.wrongWords[lv]||{};
+    Object.keys(ww).filter(k=>ww[k]>=2).forEach(k=>{
+      const match=VOCAB[lv].find(v=>v.de===k);
+      if(match&&!result.find(r=>r.de===match.de))result.push(match);
+    });
+  });
+  return result;
+}
+
+// ── START QUIZ ─────────────────────────────────────
+function startQuiz(){
+  if(cfg.from===cfg.to)return;
+  let selected=[];
+  if(cfg.level==='problems'){
+    const pool=getProblemWords();
+    if(!pool.length){alert('Noch keine Problemwörter!');return;}
+    selected=shuffle(pool).slice(0,Math.min(5,pool.length));
+  } else {
+    const pool=VOCAB[cfg.level];
+    let avail=pool.map((_,i)=>i).filter(i=>!usedIdx[cfg.level].has(i));
+    if(avail.length<5){usedIdx[cfg.level]=new Set();avail=pool.map((_,i)=>i);}
+    const picked=shuffle(avail).slice(0,5);
+    picked.forEach(i=>usedIdx[cfg.level].add(i));
+    selected=picked.map(i=>pool[i]);
+  }
+  session={words:selected,answers:new Array(selected.length).fill(''),submitted:false};
+  renderQuiz();
+  showPage('page-quiz');
+}
+
+// ── RENDER QUIZ ────────────────────────────────────
+function renderQuiz(){
+  const container=document.getElementById('quiz-rows');
+  container.innerHTML='';
+  document.getElementById('prog').style.width='0%';
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('submit-btn').textContent='Antworten prüfen →';
+
+  session.words.forEach((word,i)=>{
+    const row=document.createElement('div');
+    row.className='quiz-row';
+
+    // Top: number + word + speak
+    const top=document.createElement('div');
+    top.className='qr-top';
+    const left=document.createElement('div');
+    left.className='qr-left';
+    left.innerHTML=`<span class="qr-num">${i+1}</span><span class="qr-word">${word[cfg.from]}</span><span class="qr-tag">${cfg.from.toUpperCase()}</span>`;
+    const sb=mkSpeak('btn-speak');
+    sb.setAttribute('aria-label','Aussprache');
+    sb.addEventListener('click',()=>speak(word[cfg.from],cfg.from,sb));
+    top.appendChild(left);top.appendChild(sb);
+
+    // Input row
+    const wrap=document.createElement('div');
+    wrap.className='quiz-input-wrap';
+
+    const inp=document.createElement('input');
+    inp.id=`inp-${i}`;
+    inp.className='quiz-input';
+    inp.type='text';
+    // All the iOS attributes that matter:
+    inp.setAttribute('autocomplete','off');
+    inp.setAttribute('autocorrect','off');
+    inp.setAttribute('autocapitalize','none');
+    inp.setAttribute('spellcheck','false');
+    inp.setAttribute('enterkeyhint', i < session.words.length-1 ? 'next' : 'done');
+    inp.placeholder=LANG_NAMES[cfg.to].replace(/ .*/,'')+' …';
+
+    // Store value on every keystroke (iOS sometimes fires 'input' late)
+    inp.addEventListener('input',function(){session.answers[i]=this.value;});
+    inp.addEventListener('change',function(){session.answers[i]=this.value;});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        session.answers[i]=this.value;
+        const nx=document.getElementById(`inp-${i+1}`);
+        if(nx){nx.focus();}
+        else{this.blur();submitAll();}
+      }
+    });
+
+    wrap.appendChild(inp);
+    row.appendChild(top);row.appendChild(wrap);
+    container.appendChild(row);
+  });
+
+  // Focus first field after page transition settles
+  setTimeout(()=>{
+    const f=document.getElementById('inp-0');
+    if(f)f.focus();
+  },400);
+}
+
+// ── SUBMIT ─────────────────────────────────────────
+function submitAll(){
+  if(session.submitted)return;
+  // Read all inputs directly from DOM before disabling
+  session.words.forEach((_,i)=>{
+    const el=document.getElementById(`inp-${i}`);
+    if(el)session.answers[i]=el.value;
+  });
+  session.submitted=true;
+  let correct=0;const results=[];
+
+  session.words.forEach((word,i)=>{
+    const inp=document.getElementById(`inp-${i}`);
+    const userVal=(session.answers[i]||'').trim();
+    const correctVal=word[cfg.to];
+    const ok=check(userVal,correctVal);
+    if(ok)correct++;
+    if(inp){inp.classList.add(ok?'ok':'err');inp.disabled=true;}
+    if(!ok){
+      const cor=document.createElement('div');cor.className='correction';
+      cor.textContent=`✓ ${correctVal} `;
+      const csb=mkSpeak('btn-speak-sm');
+      csb.addEventListener('click',()=>speak(correctVal,cfg.to,csb));
+      cor.appendChild(csb);
+      inp.closest('.quiz-row').appendChild(cor);
+    }
+    const lvl=findWordLevel(word);
+    results.push({storeKey:word.de,word:word[cfg.from],user:userVal,correct:correctVal,ok,lvl});
+  });
+
+  document.getElementById('prog').style.width='100%';
+  document.getElementById('submit-btn').disabled=true;
+
+  // Stats
+  stats.versuche++;stats.richtig+=correct;stats.falsch+=(session.words.length-correct);
+  results.forEach(r=>{
+    const lv=r.lvl||'beginner';
+    if(!stats.wrongWords[lv])stats.wrongWords[lv]={};
+    if(!r.ok){stats.wrongWords[lv][r.storeKey]=(stats.wrongWords[lv][r.storeKey]||0)+1;}
+    else{if(stats.wrongWords[lv][r.storeKey]>0)stats.wrongWords[lv][r.storeKey]--;if(stats.wrongWords[lv][r.storeKey]===0)delete stats.wrongWords[lv][r.storeKey];}
+  });
+  stats.history.unshift({date:new Date().toLocaleDateString('de-CH'),level:LEVEL_NAMES[cfg.level],from:cfg.from.toUpperCase(),to:cfg.to.toUpperCase(),correct,total:session.words.length});
+  if(stats.history.length>100)stats.history=stats.history.slice(0,100);
+  saveStats();
+  setTimeout(()=>showResults(correct,results),350);
+}
+
+function findWordLevel(wordObj){
+  for(const lv of['beginner','intermediate','expert'])if(VOCAB[lv].some(v=>v.de===wordObj.de))return lv;
+  return 'beginner';
+}
+
+// ── RESULTS ────────────────────────────────────────
+function showResults(correct,results){
+  const total=results.length;
+  const pct=Math.round(correct/total*100);
+  document.getElementById('res-pct').textContent=pct+'%';
+  const circ=339;
+  document.getElementById('ring-circle').style.strokeDashoffset=circ-(circ*pct/100);
+  document.getElementById('ring-circle').style.stroke=pct>=80?'var(--green)':pct>=60?'var(--accent)':'var(--red)';
+  const [,title,msg]=MSGS.find(([min])=>correct>=min);
+  document.getElementById('res-title').textContent=title;
+  document.getElementById('res-msg').textContent=msg;
+  document.getElementById('res-ok').textContent=`${correct} Richtig`;
+  document.getElementById('res-err').textContent=`${total-correct} Falsch`;
+
+  const detail=document.getElementById('result-detail');detail.innerHTML='';
+  results.forEach(r=>{
+    const row=document.createElement('div');row.className='result-row';
+    const left=document.createElement('div');left.className='result-left';
+    const qLine=document.createElement('div');qLine.className='result-q';
+    qLine.textContent=r.word+' ';
+    const sbQ=mkSpeak('btn-speak-sm');sbQ.addEventListener('click',()=>speak(r.word,cfg.from,sbQ));
+    qLine.appendChild(sbQ);
+    const aLine=document.createElement('div');aLine.className='result-a '+(r.ok?'ok':'err');
+    aLine.innerHTML=r.user||'<em style="color:var(--muted)">—</em>';
+    left.appendChild(qLine);left.appendChild(aLine);
+    if(!r.ok){
+      const cLine=document.createElement('div');cLine.className='correction';
+      cLine.textContent=`✓ ${r.correct} `;
+      const sbC=mkSpeak('btn-speak-sm');sbC.addEventListener('click',()=>speak(r.correct,cfg.to,sbC));
+      cLine.appendChild(sbC);left.appendChild(cLine);
+    }
+    const badge=document.createElement('span');badge.className='badge '+(r.ok?'ok':'err');badge.textContent=r.ok?'✓':'✗';
+    row.appendChild(left);row.appendChild(badge);detail.appendChild(row);
+  });
+  showPage('page-results');
+}
+
+// ── STATS RENDER ───────────────────────────────────
+function renderStats(){
+  const total=stats.richtig+stats.falsch;
+  const quote=total>0?Math.round(stats.richtig/total*100):0;
+  document.getElementById('st-versuche').textContent=stats.versuche;
+  document.getElementById('st-quote').textContent=quote+'%';
+  document.getElementById('st-richtig').textContent=stats.richtig;
+  document.getElementById('st-falsch').textContent=stats.falsch;
+
+  const allWrong=[];
+  Object.keys(stats.wrongWords).forEach(lv=>{
+    Object.keys(stats.wrongWords[lv]).forEach(key=>{
+      const cnt=stats.wrongWords[lv][key];
+      if(cnt>=1){
+        const wObj=['beginner','intermediate','expert'].reduce((f,l)=>f||VOCAB[l].find(v=>v.de===key),null);
+        allWrong.push({key,level:LEVEL_NAMES[lv]||lv,count:cnt,wObj});
+      }
+    });
+  });
+  allWrong.sort((a,b)=>b.count-a.count);
+
+  const wwEl=document.getElementById('st-wrong-list');
+  if(!allWrong.length){wwEl.innerHTML='<span style="color:var(--muted);font-size:.85rem">Noch keine Fehler — top!</span>';}
+  else{wwEl.innerHTML=allWrong.map(w=>`<div class="wrong-row"><div><div class="wrong-word">${w.key}</div>${w.wObj?`<div class="wrong-meta">EN: ${w.wObj.en} · ES: ${w.wObj.es}</div>`:''}
+    <div class="wrong-meta">${w.level}</div></div><span class="badge err">${w.count}× falsch</span></div>`).join('');}
+
+  const hEl=document.getElementById('st-history');
+  if(!stats.history.length){hEl.innerHTML='<span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span>';}
+  else{hEl.innerHTML=`<table class="hist-table"><thead><tr><th>Datum</th><th>Level</th><th>Spr.</th><th>Score</th></tr></thead><tbody>
+    ${stats.history.slice(0,30).map(h=>`<tr><td style="color:var(--muted)">${h.date}</td><td>${h.level}</td><td style="color:var(--muted)">${h.from}→${h.to}</td>
+    <td style="color:${h.correct===h.total?'var(--green)':h.correct>=h.total*.6?'var(--accent2)':'var(--red)'};font-weight:600">${h.correct}/${h.total}</td></tr>`).join('')}
+    </tbody></table>`;}
+}
+
+function resetStats(){
+  if(confirm('Statistik wirklich zurücksetzen?')){
+    stats=initStats();usedIdx={beginner:new Set(),intermediate:new Set(),expert:new Set()};
+    saveStats();renderStats();updateProblemBadge();
+  }
+}
+
+// ── iOS INSTALL BANNER ─────────────────────────────
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+if(isIOS&&!window.navigator.standalone)document.getElementById('install-banner').style.display='block';
+
+// ── INIT ───────────────────────────────────────────
+if (!window.VOCAB) {
+  document.body.innerHTML = '<div style="padding:30px 20px;font-family:sans-serif;color:#fff;background:#1a1a2e;min-height:100vh;">'
+    + '<h2 style="color:#f87171;">⚠️ Vokabeldaten fehlen</h2>'
+    + '<p>Die Datei <code>vocab-data.js</code> konnte nicht geladen werden.</p>'
+    + '<p>Bitte stelle sicher, dass <code>vocab-data.js</code> im selben Ordner wie <code>index.html</code> liegt (exakt so benannt, ohne Zusatz wie "(1)").</p>'
+    + '<p style="color:#94a3b8;font-size:.85rem;margin-top:16px;">Öffne die Entwicklerkonsole → Netzwerk-Tab beim Neuladen, um den genauen Fehler (z. B. 404) zu sehen.</p>'
+    + '</div>';
+  throw new Error('vocab-data.js nicht geladen — window.VOCAB fehlt');
+}
+document.getElementById('cnt-beginner').textContent = VOCAB.beginner.length;
+document.getElementById('cnt-intermediate').textContent = VOCAB.intermediate.length;
+document.getElementById('cnt-expert').textContent = VOCAB.expert.length;
+checkCfg();
+updateProblemBadge();
+initCloud();
+</script>
+</body>
+</html>
 
