@@ -114,7 +114,7 @@ body {
   color:var(--muted); cursor:pointer; -webkit-user-select:none;
   transition: all .15s;
 }
-.lang-btn .flag { font-size:1.8rem; }
+.lang-btn .flag { width:30px; height:20px; object-fit:cover; border-radius:3px; box-shadow:0 0 0 1px rgba(255,255,255,.1); }
 .lang-btn.selected { border-color:var(--accent); background:rgba(79,142,247,.1); color:var(--accent2); }
 
 /* ─── LEVEL BUTTONS ─────────────────────────────────── */
@@ -139,6 +139,49 @@ body {
 .problem-btn.selected { border-color:var(--red); background:rgba(248,113,113,.15); }
 .problem-count { display:inline-flex; align-items:center; justify-content:center; background:var(--red); color:#fff; border-radius:99px; font-size:.65rem; font-weight:700; padding:1px 7px; margin-left:6px; }
 
+/* ─── COMPACT SETUP LAYOUT (fits one screen, no scroll) ── */
+#page-setup.active {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: calc(100dvh - var(--top-h) - var(--nav-h) - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+  padding-top: calc(var(--top-h) + env(safe-area-inset-top,0px) + 8px);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 8px);
+  overflow-y: auto; /* safety fallback on very small/zoomed screens */
+}
+.compact-card { padding:10px 12px; margin-bottom:0; }
+.compact-card .card-label { margin-bottom:6px; font-size:.6rem; }
+.compact-card .lang-grid { gap:6px; }
+.compact-card .lang-btn { padding:8px 2px; font-size:.68rem; gap:3px; }
+.compact-card .level-btn,
+.compact-card .problem-btn {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 12px; margin-bottom:6px; text-align:left;
+}
+.compact-card .level-btn:last-child,
+.compact-card .problem-btn:last-child { margin-bottom:0; }
+.compact-card .ln { font-size:.82rem; font-weight:600; }
+.lvl-count {
+  font-size:.65rem; font-weight:600; color:var(--muted);
+  background:var(--s3); padding:2px 8px; border-radius:99px; flex-shrink:0;
+}
+.problem-btn .lvl-count.problem-count { background:var(--red); color:#fff; }
+#page-setup #wrong-alert { padding:7px 12px; font-size:.7rem; margin-bottom:0; }
+#page-setup #start-btn { padding:13px; margin-top:0; }
+#page-setup .install-banner { padding:8px 12px; font-size:.68rem; margin-bottom:0; }
+#page-setup .install-banner strong { font-size:.72rem; margin-bottom:1px; }
+
+/* Extra-compact on short screens (e.g. iPhone SE) */
+@media (max-height: 700px) {
+  .compact-card { padding:7px 10px; }
+  .compact-card .card-label { margin-bottom:4px; }
+  .compact-card .lang-btn { padding:5px 2px; font-size:.62rem; }
+  .lang-btn .flag { width:24px; height:16px; }
+  .compact-card .level-btn, .compact-card .problem-btn { padding:7px 10px; margin-bottom:4px; }
+  .compact-card .ln { font-size:.76rem; }
+  #page-setup { gap:6px; }
+}
+
 /* ─── BUTTONS ───────────────────────────────────────── */
 .btn-primary {
   background:var(--accent); border:none; border-radius:14px; color:#fff;
@@ -159,13 +202,34 @@ body {
 .progress { height:3px; background:var(--border); border-radius:99px; margin-bottom:14px; overflow:hidden; }
 .progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .5s ease; }
 
+/* ─── AUTOSPEAK TOGGLE ──────────────────────────────── */
+.autospeak-row {
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--s1); border:1px solid var(--border); border-radius:12px;
+  padding:10px 14px; margin-bottom:14px;
+}
+#autospeak-label { font-size:.78rem; color:var(--text); font-weight:500; }
+.toggle-switch {
+  position:relative; width:44px; height:26px; flex-shrink:0;
+  background:var(--s3); border:1.5px solid var(--border); border-radius:99px;
+  cursor:pointer; -webkit-user-select:none; padding:0; transition:background .2s,border-color .2s;
+}
+.toggle-switch.on { background:var(--accent); border-color:var(--accent); }
+.toggle-knob {
+  position:absolute; top:2px; left:2px; width:19px; height:19px;
+  background:#fff; border-radius:50%; transition:transform .2s;
+  box-shadow:0 1px 2px rgba(0,0,0,.3);
+}
+.toggle-switch.on .toggle-knob { transform:translateX(18px); }
+
 /* ─── QUIZ ROW ───────────────────────────────────────── */
 .quiz-row { background:var(--s1); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:12px; }
 .qr-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .qr-left { display:flex; align-items:baseline; gap:6px; flex:1; flex-wrap:wrap; }
 .qr-num { font-size:.68rem; color:var(--muted); font-weight:600; flex-shrink:0; }
 .qr-word { font-family:'Fraunces',serif; font-size:1.4rem; font-weight:700; line-height:1.1; }
-.qr-tag { font-size:.58rem; color:var(--muted); background:var(--s2); border:1px solid var(--border); border-radius:99px; padding:1px 6px; }
+.qr-tag { display:inline-flex; align-items:center; gap:3px; font-size:.58rem; color:var(--muted); background:var(--s2); border:1px solid var(--border); border-radius:99px; padding:1px 7px 1px 4px; }
+.flag-tiny { width:14px; height:10px; object-fit:cover; border-radius:2px; display:inline-block; vertical-align:middle; }
 
 /*
   CRITICAL iOS INPUT FIX:
@@ -292,43 +356,36 @@ body {
     Safari → Teilen → <strong>„Zum Home-Bildschirm"</strong>
   </div>
 
-  <div class="card">
-    <div class="card-label">Fragensprache — diese Wörter sehe ich</div>
+  <div class="card compact-card">
+    <div class="card-label">Frage — diese Wörter sehe ich</div>
     <div class="lang-grid">
-      <button class="lang-btn selected" onclick="pick('from','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
-      <button class="lang-btn" onclick="pick('from','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
-      <button class="lang-btn" onclick="pick('from','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
-      <button class="lang-btn" onclick="pick('from','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
+      <button class="lang-btn selected" onclick="pick('from','de',this)"><img class="flag" src="https://flagcdn.com/w80/de.png" alt="DE">Deutsch</button>
+      <button class="lang-btn" onclick="pick('from','en',this)"><img class="flag" src="https://flagcdn.com/w80/gb.png" alt="EN">Englisch</button>
+      <button class="lang-btn" onclick="pick('from','es',this)"><img class="flag" src="https://flagcdn.com/w80/es.png" alt="ES">Spanisch</button>
+      <button class="lang-btn" onclick="pick('from','it',this)"><img class="flag" src="https://flagcdn.com/w80/it.png" alt="IT">Italienisch</button>
+    </div>
+    <div class="card-label" style="margin-top:10px;">Antwort — in diese Sprache übersetze ich</div>
+    <div class="lang-grid">
+      <button class="lang-btn" onclick="pick('to','de',this)"><img class="flag" src="https://flagcdn.com/w80/de.png" alt="DE">Deutsch</button>
+      <button class="lang-btn selected" onclick="pick('to','en',this)"><img class="flag" src="https://flagcdn.com/w80/gb.png" alt="EN">Englisch</button>
+      <button class="lang-btn" onclick="pick('to','es',this)"><img class="flag" src="https://flagcdn.com/w80/es.png" alt="ES">Spanisch</button>
+      <button class="lang-btn" onclick="pick('to','it',this)"><img class="flag" src="https://flagcdn.com/w80/it.png" alt="IT">Italienisch</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-label">Antwortsprache — in diese Sprache übersetze ich</div>
-    <div class="lang-grid">
-      <button class="lang-btn" onclick="pick('to','de',this)"><span class="flag">🇩🇪</span>Deutsch</button>
-      <button class="lang-btn selected" onclick="pick('to','en',this)"><span class="flag">🇬🇧</span>Englisch</button>
-      <button class="lang-btn" onclick="pick('to','es',this)"><span class="flag">🇪🇸</span>Spanisch</button>
-      <button class="lang-btn" onclick="pick('to','it',this)"><span class="flag">🇮🇹</span>Italienisch</button>
-    </div>
-  </div>
-
-  <div class="card">
+  <div class="card compact-card">
     <div class="card-label">Kategorie / Schwierigkeitsstufe</div>
     <button class="level-btn selected" onclick="pickLevel('beginner',this)">
-      <div class="ln">🌱 Beginner</div>
-      <div class="ld"><span id="cnt-beginner">…</span> Wörter · Alltag, Farben, Zahlen, Familie</div>
+      <span class="ln">🌱 Beginner</span><span class="lvl-count" id="cnt-beginner">…</span>
     </button>
     <button class="level-btn" onclick="pickLevel('intermediate',this)">
-      <div class="ln">📚 Fortgeschritten</div>
-      <div class="ld"><span id="cnt-intermediate">…</span> Wörter · Gesellschaft, Reisen, Berufe</div>
+      <span class="ln">📚 Fortgeschritten</span><span class="lvl-count" id="cnt-intermediate">…</span>
     </button>
     <button class="level-btn" onclick="pickLevel('expert',this)">
-      <div class="ln">🎓 Experte</div>
-      <div class="ld"><span id="cnt-expert">…</span> Wörter · Politik, Wirtschaft, Wissenschaft</div>
+      <span class="ln">🎓 Experte</span><span class="lvl-count" id="cnt-expert">…</span>
     </button>
     <button class="problem-btn" id="problem-level-btn" onclick="pickLevel('problems',this)">
-      <div class="ln">❌ Problemwörter <span class="problem-count" id="problem-count-badge">0</span></div>
-      <div class="ld">Nur falsch beantwortete Wörter üben</div>
+      <span class="ln">❌ Problemwörter</span><span class="lvl-count problem-count" id="problem-count-badge">0</span>
     </button>
   </div>
 
@@ -342,6 +399,12 @@ body {
 <!-- ══════ PAGE: QUIZ ══════ -->
 <div class="page" id="page-quiz">
   <div class="progress"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  <div class="autospeak-row">
+    <span id="autospeak-label">🔊 Automatische Aussprache</span>
+    <button class="toggle-switch" id="autospeak-toggle" onclick="toggleAutoSpeak()" aria-label="Automatische Aussprache umschalten">
+      <span class="toggle-knob"></span>
+    </button>
+  </div>
   <div id="quiz-rows"></div>
   <button class="btn-primary" id="submit-btn" onclick="submitAll()">Antworten prüfen →</button>
   <button class="btn-ghost" onclick="goSetup()">← Zurück</button>
@@ -380,6 +443,21 @@ body {
 
 <!-- ══════ PAGE: STATISTIK ══════ -->
 <div class="page" id="page-stats">
+  <div class="card" id="sync-card" style="display:none;">
+    <div class="card-label">☁️ Cloud-Sync</div>
+    <div id="sync-logged-out">
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">Melde dich per E-Mail an, um deinen Fortschritt geräteübergreifend zu synchronisieren.</p>
+      <input type="email" id="sync-email" class="quiz-input" placeholder="deine@email.ch" autocapitalize="none" autocorrect="off" style="margin-bottom:8px;">
+      <button class="btn-primary" style="margin-top:0;" onclick="sendMagicLink()">Login-Link senden</button>
+      <div class="status-msg" id="sync-status" style="font-size:.78rem;color:var(--muted);margin-top:8px;"></div>
+    </div>
+    <div id="sync-logged-in" style="display:none;">
+      <p style="font-size:.82rem;">✅ Angemeldet als <strong id="sync-user-email"></strong></p>
+      <p style="font-size:.75rem;color:var(--muted);margin:4px 0 10px;">Dein Fortschritt wird automatisch synchronisiert.</p>
+      <button class="btn-ghost" onclick="signOutCloud()">Abmelden</button>
+    </div>
+  </div>
+
   <div class="stats-grid">
     <div class="stat-box"><div class="stat-n stat-blue" id="st-versuche">0</div><div class="stat-l">Versuche</div></div>
     <div class="stat-box"><div class="stat-n stat-gold" id="st-quote">0%</div><div class="stat-l">Trefferquote</div></div>
@@ -395,21 +473,6 @@ body {
     <div id="st-history"><span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span></div>
   </div>
   <button class="btn-ghost" style="color:var(--red);border-color:rgba(248,113,113,.3);" onclick="resetStats()">🗑 Statistik zurücksetzen</button>
-
-  <div class="card" id="sync-card" style="display:none;">
-    <div class="card-label">☁️ Cloud-Sync</div>
-    <div id="sync-logged-out">
-      <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">Melde dich per E-Mail an, um deinen Fortschritt geräteübergreifend zu synchronisieren.</p>
-      <input type="email" id="sync-email" class="quiz-input" placeholder="deine@email.ch" autocapitalize="none" autocorrect="off" style="margin-bottom:8px;">
-      <button class="btn-primary" style="margin-top:0;" onclick="sendMagicLink()">Login-Link senden</button>
-      <div class="status-msg" id="sync-status" style="font-size:.78rem;color:var(--muted);margin-top:8px;"></div>
-    </div>
-    <div id="sync-logged-in" style="display:none;">
-      <p style="font-size:.82rem;">✅ Angemeldet als <strong id="sync-user-email"></strong></p>
-      <p style="font-size:.75rem;color:var(--muted);margin:4px 0 10px;">Dein Fortschritt wird automatisch synchronisiert.</p>
-      <button class="btn-ghost" onclick="signOutCloud()">Abmelden</button>
-    </div>
-  </div>
 </div>
 
 <!-- FIXED BOTTOM NAV -->
@@ -430,6 +493,7 @@ const VOCAB = window.VOCAB;
 
 const LANG_NAMES={de:"Deutsch 🇩🇪",en:"Englisch 🇬🇧",es:"Spanisch 🇪🇸",it:"Italienisch 🇮🇹"};
 const LANG_BCP={de:"de-DE",en:"en-GB",es:"es-ES",it:"it-IT"};
+const FLAG_CODE={de:"de",en:"gb",es:"es",it:"it"};
 const LEVEL_NAMES={beginner:"Beginner",intermediate:"Fortgeschritten",expert:"Experte",problems:"Problemwörter"};
 const MSGS=[[5,"🏆 Perfekt!","Alle 5 richtig — fantastisch!"],[4,"🌟 Ausgezeichnet!","Fast perfekt!"],[3,"👍 Gut gemacht!","Mehr als die Hälfte!"],[2,"📖 Weiter üben!","Du schaffst das!"],[0,"💪 Nicht aufgeben!","Übung macht den Meister!"]];
 
@@ -518,6 +582,20 @@ function saveStats(){
   if(cloudUser) pushStatsToCloud();
 }
 let stats=loadStats();
+let autoSpeakOn = localStorage.getItem('vk3_autospeak') !== 'off'; // Standard: an
+
+function toggleAutoSpeak(){
+  autoSpeakOn = !autoSpeakOn;
+  localStorage.setItem('vk3_autospeak', autoSpeakOn ? 'on' : 'off');
+  updateAutoSpeakToggleUI();
+}
+function updateAutoSpeakToggleUI(){
+  const t=document.getElementById('autospeak-toggle');
+  const l=document.getElementById('autospeak-label');
+  if(!t)return;
+  t.classList.toggle('on', autoSpeakOn);
+  if(l)l.textContent = autoSpeakOn ? '🔊 Automatische Aussprache' : '🔇 Stumm üben (kein Autoplay)';
+}
 
 // ── SPEECH ─────────────────────────────────────────
 let activeSpeakBtn=null;
@@ -590,6 +668,13 @@ function updateProblemBadge(){
 }
 
 // ── PROBLEM WORDS ──────────────────────────────────
+function getWeakWordsForLevel(lv){
+  const ww=stats.wrongWords[lv]||{};
+  return Object.keys(ww).filter(k=>ww[k]>=1)
+    .sort((a,b)=>ww[b]-ww[a])
+    .map(k=>VOCAB[lv].find(v=>v.de===k))
+    .filter(Boolean);
+}
 function getProblemWords(){
   const result=[];
   ['beginner','intermediate','expert'].forEach(lv=>{
@@ -612,11 +697,16 @@ function startQuiz(){
     selected=shuffle(pool).slice(0,Math.min(5,pool.length));
   } else {
     const pool=VOCAB[cfg.level];
-    let avail=pool.map((_,i)=>i).filter(i=>!usedIdx[cfg.level].has(i));
-    if(avail.length<5){usedIdx[cfg.level]=new Set();avail=pool.map((_,i)=>i);}
-    const picked=shuffle(avail).slice(0,5);
+    // Problemwörter (schon ab 1 Fehler) bevorzugt einstreuen, bis zu 2 von 5
+    const weak=shuffle(getWeakWordsForLevel(cfg.level)).slice(0,2);
+    selected.push(...weak);
+    const weakKeys=new Set(weak.map(w=>w.de));
+    let avail=pool.map((_,i)=>i).filter(i=>!usedIdx[cfg.level].has(i)&&!weakKeys.has(pool[i].de));
+    if(avail.length<5-selected.length){usedIdx[cfg.level]=new Set();avail=pool.map((_,i)=>i).filter(i=>!weakKeys.has(pool[i].de));}
+    const picked=shuffle(avail).slice(0,5-selected.length);
     picked.forEach(i=>usedIdx[cfg.level].add(i));
-    selected=picked.map(i=>pool[i]);
+    selected.push(...picked.map(i=>pool[i]));
+    selected=shuffle(selected);
   }
   session={words:selected,answers:new Array(selected.length).fill(''),submitted:false};
   renderQuiz();
@@ -630,6 +720,7 @@ function renderQuiz(){
   document.getElementById('prog').style.width='0%';
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-btn').textContent='Antworten prüfen →';
+  updateAutoSpeakToggleUI();
 
   session.words.forEach((word,i)=>{
     const row=document.createElement('div');
@@ -640,7 +731,7 @@ function renderQuiz(){
     top.className='qr-top';
     const left=document.createElement('div');
     left.className='qr-left';
-    left.innerHTML=`<span class="qr-num">${i+1}</span><span class="qr-word">${word[cfg.from]}</span><span class="qr-tag">${cfg.from.toUpperCase()}</span>`;
+    left.innerHTML=`<span class="qr-num">${i+1}</span><span class="qr-word">${word[cfg.from]}</span><span class="qr-tag"><img class="flag-tiny" src="https://flagcdn.com/w40/${FLAG_CODE[cfg.from]}.png" alt="">${cfg.from.toUpperCase()}</span>`;
     const sb=mkSpeak('btn-speak');
     sb.setAttribute('aria-label','Aussprache');
     sb.addEventListener('click',()=>speak(word[cfg.from],cfg.from,sb));
@@ -661,6 +752,9 @@ function renderQuiz(){
     inp.setAttribute('spellcheck','false');
     inp.setAttribute('enterkeyhint', i < session.words.length-1 ? 'next' : 'done');
     inp.placeholder=LANG_NAMES[cfg.to].replace(/ .*/,'')+' …';
+
+    // Aussprache automatisch beim Fokussieren des Feldes (= beim Abfragen des Wortes) — nur wenn Toggle aktiv
+    inp.addEventListener('focus',function(){if(autoSpeakOn)speak(word[cfg.from],cfg.from,sb);});
 
     // Store value on every keystroke (iOS sometimes fires 'input' late)
     inp.addEventListener('input',function(){session.answers[i]=this.value;});
@@ -805,7 +899,7 @@ function renderStats(){
   const hEl=document.getElementById('st-history');
   if(!stats.history.length){hEl.innerHTML='<span style="color:var(--muted);font-size:.85rem">Noch keine Runden.</span>';}
   else{hEl.innerHTML=`<table class="hist-table"><thead><tr><th>Datum</th><th>Level</th><th>Spr.</th><th>Score</th></tr></thead><tbody>
-    ${stats.history.slice(0,30).map(h=>`<tr><td style="color:var(--muted)">${h.date}</td><td>${h.level}</td><td style="color:var(--muted)">${h.from}→${h.to}</td>
+    ${stats.history.slice(0,30).map(h=>`<tr><td style="color:var(--muted)">${h.date}</td><td>${h.level}</td><td style="color:var(--muted);white-space:nowrap"><img class="flag-tiny" src="https://flagcdn.com/w40/${FLAG_CODE[h.from.toLowerCase()]||'de'}.png" alt="">→<img class="flag-tiny" src="https://flagcdn.com/w40/${FLAG_CODE[h.to.toLowerCase()]||'de'}.png" alt=""></td>
     <td style="color:${h.correct===h.total?'var(--green)':h.correct>=h.total*.6?'var(--accent2)':'var(--red)'};font-weight:600">${h.correct}/${h.total}</td></tr>`).join('')}
     </tbody></table>`;}
 }
@@ -840,4 +934,3 @@ initCloud();
 </script>
 </body>
 </html>
-
