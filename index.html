@@ -455,8 +455,8 @@ let currentTab='quiz'; // 'quiz' | 'stats'
 //      for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 //
 // 4. Aktiviere in Supabase unter Authentication → Providers "Email" (Magic Link).
-const SUPABASE_URL = https://cpkymansglprkskahkpu.supabase.co/rest/v1/;
-const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3ltYW5zZ2xwcmtza2Foa3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDg1NjAsImV4cCI6MjEwMTkyNDU2MH0.exOEoZ-DINBKIzaelWsYPbWFSGKR5Kd0S_BjRC-EJfE;
+const SUPABASE_URL = "https://cpkymansglprkskahkpu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3ltYW5zZ2xwcmtza2Foa3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDg1NjAsImV4cCI6MjEwMTkyNDU2MH0.exOEoZ-DINBKIzaelWsYPbWFSGKR5Kd0S_BjRC-EJfE";
 const cloudEnabled = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 10;
 let sb = null, cloudUser = null;
 if (cloudEnabled && window.supabase) {
@@ -840,3 +840,4 @@ initCloud();
 </script>
 </body>
 </html>
+
